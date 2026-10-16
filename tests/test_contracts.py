@@ -25,10 +25,12 @@ class Contracts(unittest.TestCase):
     def test_media_url(self):
         self.assertEqual(Media(Path('.'),'id','https://example.org/m/').video_url,'https://example.org/m/media/id/video.mp4')
     def test_long_cyrillic_heading(self):
+        render.ensure_fonts()
         d=ImageDraw.Draw(Image.new('RGB',(1080,1920)))
         f,ls=render.fit(d,'*Подозрительный звонок*',render.BOLD,920,118,60,5)
         self.assertTrue(all(d.textlength(x.replace('*',''),font=f)<=920 for x in ls))
     def test_overflow_fails_closed(self):
+        render.ensure_fonts()
         d=ImageDraw.Draw(Image.new('RGB',(1080,1920)))
         with self.assertRaises(ValueError):render.fit(d,'ы'*100,render.BOLD,920,118,60,5)
     def test_error_redacts_url(self):

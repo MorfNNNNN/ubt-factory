@@ -40,7 +40,9 @@ jobs:
           python -m pip install -r factory/requirements.txt
           python -m pip install pytest
           ffmpeg -version | head -1
-      - name: Unit tests (no network)
+      - name: Fetch fonts (cached after first run)
+        run: python -c "import sys; sys.path.insert(0,'factory'); import render; render.ensure_fonts()"
+      - name: Unit tests
         run: python -m pytest tests/ -q
       - name: Validate topic bank
         run: python factory/briefs.py factory/topics.json /tmp/_lint && rm -rf /tmp/_lint
