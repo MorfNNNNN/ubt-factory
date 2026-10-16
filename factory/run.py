@@ -146,6 +146,10 @@ def process_one(no_publish: bool) -> bool:
     print(f"claimed {script['id']} project={script.get('project')}", flush=True)
     # Slim queue rows carry beats only; captions are rebuilt deterministically here.
     script = enrich_script(script, TOPICS)
+    want_project = os.environ.get("DEFAULT_PROJECT")
+    if want_project and script.get("project") != want_project:
+        report([], done=True)
+        raise SystemExit(f"project mismatch: claimed {script.get('project')}, want {want_project}")
     def report(results, done=False, rendered=False):
         return api("POST", "/f/report", json={"script": script["id"], "claim_token": lease,
                    "results": results, "done": done, "rendered": rendered})
