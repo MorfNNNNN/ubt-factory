@@ -1,0 +1,6 @@
+__pycache__/
+.venv/
+voices/*.onnx
+voices/*.json
+factory/fonts/*.ttf
+*.mp4

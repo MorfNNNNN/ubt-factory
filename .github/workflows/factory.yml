@@ -1,0 +1,65 @@
+name: ubt-factory-economy
+on:
+  schedule:
+    # 19:00 Asia/Barnaul (UTC+7), every day. Formats rotate via factory/plan.py.
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+    inputs:
+      render_only:
+        description: "Render only; publication additionally requires RELEASE_ENABLED"
+        default: true
+        type: boolean
+concurrency:
+  group: ubt-factory
+  cancel-in-progress: false
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  run:
+    # Runs by default in safe render-only mode; set variable FACTORY_ENABLED=false to pause.
+    # Publishing additionally requires RELEASE_ENABLED=true and Composio secrets.
+    if: vars.FACTORY_ENABLED != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: factory/requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: |
+            voices
+            factory/fonts
+          key: media-v1
+      - name: Install dependencies
+        run: |
+          python -m pip install -r factory/requirements.txt
+          python -m pip install pytest
+          ffmpeg -version | head -1
+      - name: Unit tests (no network)
+        run: python -m pytest tests/ -q
+      - name: Validate topic bank
+        run: python factory/briefs.py factory/topics.json /tmp/_lint && rm -rf /tmp/_lint
+      - name: Run one bounded package
+        env:
+          WORKER_URL: ${{ vars.WORKER_URL }}
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+          COMPOSIO_USER_ID: ${{ vars.COMPOSIO_USER_ID }}
+          DEFAULT_PROJECT: ${{ vars.DEFAULT_PROJECT }}
+          REQUEST_RENDER_ONLY: ${{ inputs.render_only }}
+          RELEASE_ENABLED: ${{ vars.RELEASE_ENABLED }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
+          BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
+          MASTODON_INSTANCE: ${{ vars.MASTODON_INSTANCE }}
+          MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
+        run: |
+          EXTRA="--render-only"
+          if [ "$RELEASE_ENABLED" = "true" ] && [ "$REQUEST_RENDER_ONLY" != "true" ]; then EXTRA=""; fi
+          python factory/run.py --max-scripts 1 $EXTRA

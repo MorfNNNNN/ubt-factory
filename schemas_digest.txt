@@ -1,0 +1,125 @@
+## FACEBOOK_CREATE_VIDEO_POST required= ['page_id']
+  title: string — Title of the video
+  video: object — Local video file to upload. At least one of 'video' or 'file_url' must be provided.
+  page_id: string — The ID of the Facebook Page Must be a Facebook Page ID (not a personal profile ID); the authenticated token must have manage-level access.
+  file_url: string — URL of the video file to upload. At least one of 'file_url' or 'video' must be provided. Must be a direct download URL (e.g., direct MP4 link), not a 
+  published: boolean — Whether to publish immediately
+  targeting: object — Audience targeting specifications
+  description: string — Description of the video
+  scheduled_publish_time: integer — Unix timestamp to schedule the video post Requires `published=false`; must be a UTC Unix epoch at least ~10 minutes in the future. Combining with `pub
+## FACEBOOK_LIST_MANAGED_PAGES required= None
+  after: string — Cursor string for forward pagination. Use the 'after' cursor from a previous response's paging.cursors.after field to retrieve the next page of result
+  limit: integer — Maximum number of pages to retrieve per request.
+  before: string — Cursor string for backward pagination. Use the 'before' cursor from a previous response's paging.cursors.before field to retrieve the previous page of
+  fields: string — Comma-separated list of fields to return for each managed page.
+  user_id: string — The ID of the user whose managed pages to retrieve. Defaults to 'me' for current user.
+## INSTAGRAM_GET_USER_INFO required= None
+  fields: string — Optional exact comma-separated projection of Instagram user fields. Supported profile fields include id, user_id, username, name, account_type, profil
+  ig_user_id: string — Instagram Business Account ID. IMPORTANT: You can only query Business/Creator accounts that you manage through Facebook Business Manager. Use "me" to 
+  graph_api_version: string — The Facebook Graph API version to use for the request.
+## INSTAGRAM_POST_IG_USER_MEDIA required= ['ig_user_id']
+  caption: string — Caption text for the post. Use HTML URL encoding for hashtags (# becomes %23).
+  alt_text: string — Custom accessibility alt text for a single image or an image carousel child. Maximum 1,000 characters. Not supported for videos, Reels, Stories, or ca
+  children: array — For carousel posts - array of container IDs (2-10 items) from previously created media containers.
+  cover_url: string — For Reels - MUST be a valid HTTP/HTTPS URL pointing to a custom cover image that Meta can fetch. Query parameters, including signed CDN or object-stor
+  image_url: string — MUST be a valid HTTP/HTTPS URL pointing to a JPEG image file that Meta can fetch. Must start with 'http://' or 'https://' (e.g., 'https://example.com/
+  user_tags: array — Array of user tag objects for tagging public Instagram accounts. For images: x and y coordinates (0.0-1.0, from top-left) are REQUIRED. For Reels: onl
+  video_url: string — MUST be a valid HTTP/HTTPS URL pointing to a video or Reel MP4 file that Meta can fetch. Must start with 'http://' or 'https://' (e.g., 'https://examp
+  audio_name: string — For Reels - custom name for the audio track (default: 'Original Audio').
+  ig_user_id: string — The unique identifier of the Instagram Business account (IG User ID) to create media for. This must be an Instagram Business account.
+  image_file: object — Image file to upload. The file will be uploaded to a temporary public URL for Instagram to fetch. At least one of: image_url, image_file, video_url, v
+  media_type: string enum=['REELS', 'CAROUSEL', 'STORIES'] — Media type for the container. Valid values: 'REELS' (for video content), 'CAROUSEL' (for carousel posts with children), 'STORIES' (for story posts). W
+  video_file: object — Video file to upload. The file will be uploaded to a temporary public URL for Instagram to fetch. At least one of: image_url, image_file, video_url, v
+  location_id: string — Facebook Page ID of a location to tag. The Page must have latitude/longitude data.
+  thumb_offset: integer — For videos/Reels - millisecond offset for thumbnail frame (default: 0).
+  share_to_feed: boolean — For Reels - whether to share to both Feed and Reels tabs. Only applicable when media_type is REELS.
+  is_carousel_item: boolean — Indicates this container is part of a carousel. For carousels: create 2-10 individual containers, then create a parent carousel container with their I
+  graph_api_version: string — Instagram Graph API version to use. Defaults to v21.0.
+## INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH required= ['ig_user_id', 'creation_id']
+  ig_user_id: string — Instagram Business Account ID (numeric string) or 'me' for the authenticated user. This ID is returned by INSTAGRAM_GET_USER_INFO or similar actions. 
+  creation_id: string — Container ID returned by INSTAGRAM_CREATE_MEDIA_CONTAINER (numeric string). This is NOT the same as ig_user_id. Do NOT pass bank account numbers or ot
+  max_wait_seconds: integer — Maximum time in seconds to wait for the container to reach FINISHED status before publishing. Images are typically ready instantly, but videos/reels c
+  graph_api_version: string — Instagram Graph API version to use. Defaults to v21.0.
+  poll_interval_seconds: number — Interval in seconds between status checks while waiting for the container to be ready. Default is 3 seconds.
+## LINKEDIN_CREATE_VIDEO_POST required= ['video_urn', 'commentary']
+  title: string — Optional title displayed with the video.
+  video_urn: string — URN of an uploaded LinkedIn video that is ready to publish.
+  commentary: string — Text to publish with the video. LinkedIn mentions and hashtags may use Little Text Format.
+  visibility: string enum=['PUBLIC', 'CONNECTIONS', 'LOGGED_IN'] — Who can see the personal video post: everyone, the member's connections, or signed-in LinkedIn members.
+## LINKEDIN_GET_MY_INFO required= None
+## LINKEDIN_UPLOAD_VIDEO required= None
+  file: object — A file the caller hands IN. ``s3key`` is an S3/R2 reference (production) or a
+base64 ``data:`` URL (self-hosted ``FILE_BACKEND=base64``) — the ``FileS
+      name: string — 
+      s3key: string — 
+      mimetype: string — 
+  video_url: string — Public HTTP or HTTPS URL of an MP4 video. Provide this or file, but not both.
+## PINTEREST_CREATE_PIN required= ['board_id', 'media_source']
+  link: string — Optional destination URL, up to 2048 characters.
+  title: string — Optional Pin title, up to 100 characters.
+  alt_text: string — Optional accessible description, up to 500 characters.
+  board_id: string — Numeric ID of the destination Pinterest board.
+  description: string — Optional Pin description, up to 800 characters.
+  media_source: oneOf — Official image URL, image Base64, carousel URL, carousel Base64, or registered-video source. The closed-beta pin_url source is not supported.
+     | alt: ImageBase64Source {'data': 'string', 'source_type': 'string', 'content_type': ['image/jpeg', 'image/png']}
+     | alt: ImageUrlSource {'url': 'string', 'source_type': 'string'}
+     | alt: CarouselBase64Source {'index': None, 'items': 'array', 'source_type': 'string'}
+     | alt: CarouselUrlSource {'index': None, 'items': 'array', 'source_type': 'string'}
+     | alt: VideoIdSource {'media_id': 'string', 'source_type': 'string', 'cover_image_url': None, 'cover_image_data': None, 'cover_image_content_type': None, 'cover_image_key_frame_time': None}
+  dominant_color: string — Optional dominant hexadecimal color, for example #6E7874.
+  board_section_id: string — Optional numeric ID of a section within the destination board.
+  ai_disclosure_values: array — Optional creator declarations: AI_MODIFIED and/or SYNTHETIC_PERFORMER. Pinterest receives these under ai_disclosures.values.
+## PINTEREST_LIST_BOARDS required= None
+  privacy: string enum=['ALL', 'PUBLIC', 'PROTECTED', 'SECRET', 'PUBLIC_AND_SECRET'] — Board privacy filter: ALL, PUBLIC, PROTECTED, SECRET, or PUBLIC_AND_SECRET.
+  bookmark: string — Opaque bookmark returned by the previous page. Omit for the first page.
+  page_size: integer — Maximum boards to return (1-250).
+## TIKTOK_FETCH_PUBLISH_STATUS required= ['publish_id']
+  publish_id: string — The unique identifier (max 64 characters) returned from a video upload or photo post initialization. Used to track the posting action and check its pr
+## TIKTOK_UPLOAD_VIDEO required= ['file_to_upload']
+  caption: string — Optional caption/title used when publish=true. Max 2200 UTF-16 runes.
+  is_aigc: boolean — Set true to label the video as AI-generated content.
+  publish: boolean — If true, attempts to publish after upload using the returned publish_id.
+  disable_duet: boolean — Whether to disable duets on the video.
+  privacy_level: string enum=['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'] — Privacy levels accepted by TikTok's Content Posting API.
+
+The valid set for a given account is only discoverable via
+``/v2/post/publish/creator_info/q
+  disable_stitch: boolean — Whether to disable stitches on the video.
+  file_to_upload: object — Video file to upload to TikTok. Files are uploaded whole when possible and split into sequential TikTok-compatible chunks for larger videos. Supported
+  disable_comment: boolean — Whether to disable comments on the video.
+  chunk_size_bytes: integer — Optional chunk size for multipart uploads. Must be between 5,000,000 and 64,000,000 bytes and must produce a valid TikTok upload plan. Omit this to ch
+  brand_content_toggle: boolean — Set true if the content is a paid partnership promoting a third-party business.
+  brand_organic_toggle: boolean — Set true if the content promotes the creator's own business.
+  video_cover_timestamp_ms: integer — Timestamp in milliseconds to use as video cover/thumbnail (e.g., 1000 for 1 second into video).
+## TWITTER_CREATION_OF_A_POST required= None
+  text: string — Text content of the Tweet. Length limits are enforced by the X (Twitter) API and depend on the authenticated user's account tier — basic accounts are 
+  card_uri: string — URI of a card to attach. Mutually exclusive with `quote_tweet_id`, `poll` parameters, `media` parameters, and `direct_message_deep_link`.
+  nullcast: boolean — Marks the Tweet as a promoted-only post, not appearing in public timelines or served to followers.
+  geo_place_id: string — Twitter Place ID to associate with the Tweet.
+  poll_options: array — List of 2 to 4 poll options (max 25 characters each). Required if creating a poll. Mutually exclusive with `card_uri`.
+  quote_tweet_id: string — ID of the Tweet to quote. MUST be a numeric string containing only digits (1-19 digits). Accepts string or numeric types, automatically converted to s
+  reply_settings: string enum=['following', 'mentionedUsers', 'subscribers'] — Specifies who can reply to this Tweet. Valid values are: 'following' (users following the author), 'mentionedUsers' (users mentioned in the Tweet - no
+  media_media_ids: array — Up to 4 Media IDs obtained from prior uploads. Each Media ID MUST be a numeric string containing only digits (1-19 digits), matching the pattern ^[0-9
+  poll_reply_settings: string enum=['following', 'mentionedUsers', 'subscribers', 'verified'] — Per X's live TweetCreateRequest schema (poll.reply_settings), all 4
+values are valid - the same set as the top-level reply_settings enum,
+plus 'verifi
+  media_tagged_user_ids: array — User IDs to tag in media; tagged users must have enabled photo tagging. Mutually exclusive with `card_uri`.
+  poll_duration_minutes: integer — Poll duration in minutes (5-10080). Required if `poll_options` are provided. Mutually exclusive with `card_uri`.
+  direct_message_deep_link: string — Deep link to a private Direct Message conversation. Mutually exclusive with `card_uri`.
+  for_super_followers_only: boolean — Restricts Tweet visibility to the author's Super Followers.
+  reply_in_reply_to_tweet_id: string — ID of the Tweet to which this is a reply. MUST be a numeric string containing only digits (1-19 digits). Accepts string or numeric types, automaticall
+  reply_exclude_reply_user_ids: array — User IDs to exclude from @mentioning in the reply; these users will not be notified. Used when `reply_in_reply_to_tweet_id` is set.
+## TWITTER_GET_MEDIA_UPLOAD_STATUS required= ['media_id']
+  media_id: string — Numeric media ID (1-19 digits) returned from a previous media upload.
+## TWITTER_UPLOAD_LARGE_MEDIA required= ['media']
+  media: object — The media file to upload. Supported mimetypes: video/mp4, video/webm, image/gif, image/jpeg, image/png, image/webp. If mimetype is generic (e.g., appl
+  shared: boolean — Whether this media is shared or not. Optional parameter.
+  media_category: string enum=['tweet_image', 'tweet_gif', 'tweet_video', 'amplify_video'] — Media category for the upload. Valid values: tweet_image, tweet_gif, tweet_video, amplify_video. Optional; auto-detected from mimetype or file extensi
+  additional_owners: array — A list of user IDs to set as additional owners allowed to use the returned media_id in Tweets or Cards. Each user ID must be a string of 1-19 digits.
+## YOUTUBE_UPLOAD_VIDEO required= ['title', 'description', 'tags', 'categoryId', 'privacyStatus', 'videoFilePath']
+  tags: array — List of keyword tags (strings) for the video, used to improve discoverability.
+  title: string — The title for the video.
+  categoryId: string — YouTube category ID (e.g., '22' for People & Blogs). Can be provided as a string or integer. See YouTube Data API docs for a full list of category IDs
+  description: string — Detailed description of the video content, optionally including keywords and context.
+  privacyStatus: string enum=['public', 'private', 'unlisted'] — Privacy status.
+  videoFilePath: object — Video file to upload to YouTube.

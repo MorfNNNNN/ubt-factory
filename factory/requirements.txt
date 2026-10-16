@@ -1,0 +1,4 @@
+piper-tts>=1.2,<2
+pillow>=10
+requests>=2.31
+composio==0.27.0
