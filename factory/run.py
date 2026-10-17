@@ -105,6 +105,8 @@ def _tk(a: dict) -> str:
 def resolve_accounts(accounts: list) -> list:
     """Map ledger accounts to live Composio connected accounts; drop unresolvable
     ones BEFORE any reservation so a bad id can never brick an account."""
+    if (os.environ.get("COMPOSIO_API_KEY") or "").startswith("ck_"):
+        return accounts  # Connect MCP addresses accounts by their ledger alias directly
     out = []
     for acc in accounts:
         if acc.get("kind") != "composio":
@@ -132,15 +134,24 @@ def preflight() -> bool:
     print(f"preflight: RELEASE_ENABLED={os.environ.get('RELEASE_ENABLED')!r}", flush=True)
     print(f"preflight: COMPOSIO_API_KEY present={bool(key)} len={len(key)} "
           f"starts_ak_={key.startswith('ak_')} type_marker={(key.split('_')[0] + '_') if '_' in key[:5] else 'none'}", flush=True)
-    if key:
-        for hdr in ("x-user-api-key", "Authorization"):
-            try:
-                v = ("Bearer " + key) if hdr == "Authorization" else key
-                rr = requests.get("https://backend.composio.dev/api/v3/auth/session/info", headers={hdr: v}, timeout=20)
-                rr2 = requests.get(COMPOSIO_URL, headers={hdr: v}, params={"limit": 1}, timeout=20)
-                print(f"preflight: diag header={hdr} session_info={rr.status_code} accounts={rr2.status_code}", flush=True)
-            except Exception as e:
-                print("preflight diag error:", safe_error(e), flush=True)
+    if key.startswith("ck_"):
+        # Composio Connect consumer key: verify through the Connect MCP endpoint itself.
+        probe = [("facebook", "FACEBOOK_LIST_MANAGED_PAGES", {"limit": 5}),
+                 ("instagram", "INSTAGRAM_GET_USER_INFO", {"ig_user_id": "me"}),
+                 ("pinterest", "PINTEREST_LIST_BOARDS", {"page_size": 5}),
+                 ("linkedin", "LINKEDIN_GET_MY_INFO", {}),
+                 ("youtube", "YOUTUBE_LIST_VIDEO_CATEGORIES", {"part": "snippet", "regionCode": "RU"})]
+        try:
+            resps = _publish.ConnectMCP(key).execute([{"tool_slug": t, "arguments": a} for _, t, a in probe])
+        except Exception as e:
+            print(f"::error::Composio Connect key rejected: {safe_error(e)}", flush=True)
+            return False
+        good = [pl for (pl, _, _), r in zip(probe, resps) if r.get("successful") is True]
+        bad = [pl for pl, _, _ in probe if pl not in good]
+        print(f"preflight: composio connect OK platforms={good} failing={bad}", flush=True)
+        if bad:
+            print(f"::warning::Composio Connect: no working connection for {bad}", flush=True)
+        return bool(good)
     code, items = composio_inventory()
     INVENTORY[:] = items
     print(f"preflight: composio inventory http={code} active_accounts={len(items)} "

@@ -27,6 +27,10 @@ class PublishError(RuntimeError):
     pass
 
 
+class RejectedError(PublishError):
+    """The remote tool explicitly answered successful=false: nothing was published."""
+
+
 @dataclass
 class Media:
     dir: Path
@@ -128,12 +132,96 @@ def _dump(resp) -> dict:
 ACCOUNT_RESOLVE: dict = {}
 
 
+# ---------------------------------------------------------------- Composio Connect (ck_ keys)
+# A Connect consumer key (ck_...) drives the same MCP endpoint and the same
+# connected accounts (aliases such as facebook_xxx) that interactive agents use.
+CONNECT_MCP = "https://connect.composio.dev/mcp"
+
+
+class ConnectMCP:
+    def __init__(self, key: str):
+        self.key, self.sid, self.n = key, None, 0
+
+    def _post(self, payload: dict, timeout: int = 300):
+        h = {"x-consumer-api-key": self.key, "Content-Type": "application/json",
+             "Accept": "application/json, text/event-stream"}
+        if self.sid:
+            h["Mcp-Session-Id"] = self.sid
+        r = requests.post(CONNECT_MCP, headers=h, json=payload, timeout=timeout)
+        if r.headers.get("mcp-session-id"):
+            self.sid = r.headers["mcp-session-id"]
+        if r.status_code >= 400:
+            raise PublishError(f"CONNECT_MCP_HTTP_{r.status_code}: {r.text[:200]}")
+        if "id" not in payload:
+            return None
+        if "text/event-stream" in r.headers.get("content-type", ""):
+            for line in r.text.splitlines():
+                if line.startswith("data:"):
+                    try:
+                        j = json.loads(line[5:].strip())
+                    except ValueError:
+                        continue
+                    if j.get("id") == payload["id"]:
+                        return j
+            raise PublishError("CONNECT_MCP_NO_RESPONSE")
+        return r.json()
+
+    def _rpc(self, method: str, params: dict, timeout: int = 300) -> dict:
+        self.n += 1
+        j = self._post({"jsonrpc": "2.0", "id": self.n, "method": method, "params": params}, timeout)
+        if j.get("error"):
+            raise PublishError(f"CONNECT_MCP_{method}: {str(j['error'])[:200]}")
+        return j.get("result") or {}
+
+    def call(self, name: str, args: dict, timeout: int = 300) -> dict:
+        if self.n == 0:
+            self._rpc("initialize", {"protocolVersion": "2025-03-26", "capabilities": {},
+                                     "clientInfo": {"name": "ubt-factory", "version": "1.0"}}, 60)
+            self._post({"jsonrpc": "2.0", "method": "notifications/initialized"}, 60)
+        res = self._rpc("tools/call", {"name": name, "arguments": args}, timeout)
+        text = "".join(c.get("text", "") for c in res.get("content", []) if c.get("type") == "text")
+        try:
+            return json.loads(text)
+        except ValueError:
+            raise PublishError(f"CONNECT_MCP_BAD_PAYLOAD: {text[:200]}")
+
+    def execute(self, tools: list) -> list:
+        out = self.call("COMPOSIO_MULTI_EXECUTE_TOOL", {
+            "tools": tools, "sync_response_to_workbench": False,
+            "thought": "ubt-factory scheduled publication", "current_step": "PUBLISH",
+            "current_step_metric": f"0/{len(tools)}"})
+        return [(r or {}).get("response") or {} for r in (out.get("data") or {}).get("results") or []]
+
+
+_mcp = None
+
+
+def is_connect(ctx: Ctx) -> bool:
+    return bool(ctx.composio_key) and ctx.composio_key.startswith("ck_")
+
+
+def mcp(ctx: Ctx) -> ConnectMCP:
+    global _mcp
+    if _mcp is None:
+        _mcp = ConnectMCP(ctx.composio_key)
+    return _mcp
+
+
 def exec_tool(ctx: Ctx, slug: str, args: dict, account_id: str) -> dict:
+    if is_connect(ctx):
+        tool = {"tool_slug": slug, "arguments": args}
+        if account_id:
+            tool["account"] = account_id
+        resp = (mcp(ctx).execute([tool]) or [{}])[0]
+        if resp.get("successful") is not True:
+            raise RejectedError(f"{slug}: {str(resp.get('error') or resp.get('data'))[:260]}")
+        data = resp.get("data")
+        return data if isinstance(data, dict) else {"data": data}
     ca_id, uid = ACCOUNT_RESOLVE.get(account_id, (account_id, ctx.user_id))
     resp = _cx(ctx).tools.execute(slug, arguments=args, connected_account_id=ca_id, user_id=uid or ctx.user_id)
     d = _dump(resp)
     if d.get("successful") is not True:
-        raise PublishError(f"{slug}: {str(d.get('error'))[:260]}")
+        raise RejectedError(f"{slug}: {str(d.get('error'))[:260]}")
     data = d.get("data")
     return data if isinstance(data, dict) else {"data": data}
 
@@ -179,8 +267,81 @@ def stage_media_file(ctx: Ctx, media: Media, path: Path, slug: str, toolkit: str
 
 
 # ---------------------------------------------------------------- composio adapters
+YT_CELL = r"""
+import json, subprocess
+def _fid(o, d=6):
+    if d < 0 or o is None: return None
+    if isinstance(o, dict):
+        for k in ("id", "videoId", "video_id"):
+            if isinstance(o.get(k), str) and len(o[k]) == 11: return o[k]
+        for v in o.values():
+            r = _fid(v, d - 1)
+            if r: return r
+    if isinstance(o, list):
+        for v in o:
+            r = _fid(v, d - 1)
+            if r: return r
+    return None
+p = "/home/user/ubt_%(sid)s.mp4"
+subprocess.run(["curl", "-sfL", "--max-time", "120", "-o", p, %(url)r], check=True)
+meta = json.loads(%(meta)r)
+out = {}
+for slug, extra in (("YOUTUBE_UPLOAD_VIDEO", {"videoFilePath": p}), ("YOUTUBE_MULTIPART_UPLOAD_VIDEO", {"videoFile": p})):
+    args = dict(meta); args.update(extra)
+    res, err = run_composio_tool(slug, args, account=%(acc)r)
+    bad = err or (isinstance(res, dict) and res.get("successful") is False)
+    out = {"slug": slug, "id": _fid(res), "err": (str(err or (res or {}).get("error")))[:300] if bad else None}
+    if not bad:
+        break
+print("UBT_RESULT=" + json.dumps(out, ensure_ascii=False))
+"""
+
+
+def _strings(o):
+    if isinstance(o, str):
+        yield o
+    elif isinstance(o, dict):
+        for v in o.values():
+            yield from _strings(v)
+    elif isinstance(o, list):
+        for v in o:
+            yield from _strings(v)
+
+
+def _yt_connect(acc, meta: dict, media, ctx) -> dict:
+    code = YT_CELL % {"sid": media.script_id, "url": media.video_url,
+                      "meta": json.dumps(meta, ensure_ascii=False), "acc": acc["id"]}
+    out = mcp(ctx).call("COMPOSIO_REMOTE_WORKBENCH", {
+        "code_to_execute": code, "thought": "Upload the rendered Short to YouTube",
+        "current_step": "YOUTUBE_UPLOAD", "current_step_metric": "0/1 videos"}, timeout=400)
+    for t in _strings(out):
+        i = t.find("UBT_RESULT=")
+        while i >= 0:
+            line = t[i + 11:].splitlines()[0] if t[i + 11:] else ""
+            try:
+                r = json.loads(line)
+            except ValueError:
+                i = t.find("UBT_RESULT=", i + 1)
+                continue
+            if r.get("err"):
+                raise RejectedError(f"{r.get('slug')}: {r['err']}")
+            return {"id": r.get("id")}
+    raise RejectedError("YOUTUBE_WORKBENCH_NO_RESULT: " + json.dumps(out, ensure_ascii=False)[:300])
+
+
 def pub_youtube(acc, script, media, ctx):
     c = captions(script, "youtube", ctx)
+    if is_connect(ctx):
+        d = _yt_connect(acc, {
+            "title": (c.get("title") or hook_line(script))[:100],
+            "description": (c.get("description") or "")[:4500],
+            "tags": [str(t)[:30] for t in (c.get("tags") or [])][:15],
+            "categoryId": str(acc["meta"].get("category_id", "27")),
+            "privacyStatus": acc["meta"].get("privacy", "public")}, media, ctx)
+        vid = find(d, "id", "videoId", "video_id")
+        if not isinstance(vid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{11}", vid):
+            raise PublishError("YOUTUBE_RECEIPT_ID_UNVERIFIED")
+        return {"remote_id": vid, "url": f"https://youtu.be/{vid}", "state": "accepted"}
     d = exec_tool(ctx, "YOUTUBE_UPLOAD_VIDEO", {
         "title": (c.get("title") or hook_line(script))[:100],
         "description": (c.get("description") or "")[:4500],
@@ -319,6 +480,23 @@ def pub_pinterest(acc, script, media, ctx):
 
 def pub_linkedin(acc, script, media, ctx):
     c = captions(script, "linkedin", ctx)
+    try:
+        return _linkedin_video(acc, c, media, ctx)
+    except RejectedError as e:
+        print(f"[linkedin] video path rejected ({str(e)[:120]}); posting text update", flush=True)
+    me = exec_tool(ctx, "LINKEDIN_GET_MY_INFO", {}, acc["id"])
+    pid = find(me, "id")
+    if not pid:
+        raise RejectedError("LI_NO_AUTHOR")
+    d = exec_tool(ctx, "LINKEDIN_CREATE_LINKED_IN_POST", {
+        "author": f"urn:li:person:{pid}",
+        "commentary": (c.get("commentary") or "")[:2800],
+        "visibility": acc["meta"].get("visibility", "PUBLIC")}, acc["id"])
+    rid = find(d, "post_urn", "ugcPost", "share_urn", "id", "x-restli-id")
+    return {"remote_id": str(rid) if rid else None}
+
+
+def _linkedin_video(acc, c, media, ctx):
     up = exec_tool(ctx, "LINKEDIN_UPLOAD_VIDEO", {"video_url": media.video_url}, acc["id"])
     urn = find(up, "video_urn", "videoUrn", "urn", "id")
     if not urn:
@@ -520,6 +698,11 @@ def publish_all(accounts: list, script: dict, media: Media, ctx: Ctx,
             result = {"account": acc["id"], "platform": acc["platform"], "state": state,
                       "url": r.get("url"), "remote_id": r.get("remote_id")}
             print(f"[{state}] {acc['platform']}", flush=True)
+        except RejectedError as e:
+            # The remote tool explicitly refused: nothing went public, safe to retry later.
+            result = {"account": acc["id"], "platform": acc["platform"],
+                      "state": "failed", "error": safe_error(e)}
+            print(f"[failed] {acc.get('platform')}: {result['error']}", flush=True)
         except Exception as e:
             # A timeout may occur AFTER a remote service has accepted the content.
             result = {"account": acc["id"], "platform": acc["platform"],
