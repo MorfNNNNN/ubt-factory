@@ -9,6 +9,10 @@ on:
         description: "Render only; publication additionally requires RELEASE_ENABLED"
         default: true
         type: boolean
+      check_only:
+        description: "Only verify publishing credentials (no render, no posts)"
+        default: false
+        type: boolean
 concurrency:
   group: ubt-factory
   cancel-in-progress: false
@@ -48,7 +52,13 @@ jobs:
         run: python -m pytest tests/ -q
       - name: Validate topic bank
         run: python factory/briefs.py factory/topics.json /tmp/_lint && rm -rf /tmp/_lint
+      - name: Preflight - publishing credentials
+        env:
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+          RELEASE_ENABLED: ${{ vars.RELEASE_ENABLED }}
+        run: python factory/run.py --check
       - name: Run one bounded package
+        if: ${{ inputs.check_only != true }}
         env:
           WORKER_URL: ${{ vars.WORKER_URL }}
           COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
@@ -65,5 +75,7 @@ jobs:
           MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
         run: |
           EXTRA="--render-only"
+          RELEASE_ENABLED=$(printf '%s' "$RELEASE_ENABLED" | tr -d ' "\r\n' | sed 's/^RELEASE_ENABLED=//' | tr 'A-Z' 'a-z')
+          export RELEASE_ENABLED
           if [ "$RELEASE_ENABLED" = "true" ] && [ "$REQUEST_RENDER_ONLY" != "true" ]; then EXTRA=""; fi
           python factory/run.py --max-scripts 1 $EXTRA

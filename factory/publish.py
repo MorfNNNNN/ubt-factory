@@ -123,8 +123,14 @@ def _dump(resp) -> dict:
     return d if isinstance(d, dict) else {"raw": str(resp)[:400]}
 
 
+# Ledger account id -> (Composio connected_account_id, user_id); filled by run.py
+# from the API key's live inventory so MCP-style aliases resolve to real ca_ ids.
+ACCOUNT_RESOLVE: dict = {}
+
+
 def exec_tool(ctx: Ctx, slug: str, args: dict, account_id: str) -> dict:
-    resp = _cx(ctx).tools.execute(slug, arguments=args, connected_account_id=account_id, user_id=ctx.user_id)
+    ca_id, uid = ACCOUNT_RESOLVE.get(account_id, (account_id, ctx.user_id))
+    resp = _cx(ctx).tools.execute(slug, arguments=args, connected_account_id=ca_id, user_id=uid or ctx.user_id)
     d = _dump(resp)
     if d.get("successful") is not True:
         raise PublishError(f"{slug}: {str(d.get('error'))[:260]}")
