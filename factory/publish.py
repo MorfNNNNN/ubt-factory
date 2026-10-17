@@ -301,8 +301,10 @@ def _fid(o, d=6):
 p = "/home/user/ubt_%(sid)s.mp4"
 subprocess.run(["curl", "-sfL", "--max-time", "120", "-o", p, %(url)r], check=True)
 meta = json.loads(%(meta)r)
-out = {}
-for slug, extra in (("YOUTUBE_UPLOAD_VIDEO", {"videoFilePath": p}), ("YOUTUBE_MULTIPART_UPLOAD_VIDEO", {"videoFile": p})):
+up, uerr = upload_local_file(p)
+out = {"slug": "upload_local_file", "id": None, "err": (str(uerr)[:300] or "no s3key")}
+fobj = {"name": "video.mp4", "mimetype": "video/mp4", "s3key": (up or {}).get("s3key")}
+for slug, extra in (() if not fobj["s3key"] else (("YOUTUBE_UPLOAD_VIDEO", {"videoFilePath": fobj}), ("YOUTUBE_MULTIPART_UPLOAD_VIDEO", {"videoFile": fobj}))):
     args = dict(meta); args.update(extra)
     res, err = run_composio_tool(slug, args, account=%(acc)r)
     bad = err or (isinstance(res, dict) and res.get("successful") is False)
