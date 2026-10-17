@@ -154,17 +154,33 @@ class ConnectMCP:
             raise PublishError(f"CONNECT_MCP_HTTP_{r.status_code}: {r.text[:200]}")
         if "id" not in payload:
             return None
-        if "text/event-stream" in r.headers.get("content-type", ""):
-            for line in r.text.splitlines():
+        ctype = r.headers.get("content-type", "")
+        msgs = []
+        if "text/event-stream" in ctype:
+            buf = []
+            for line in r.text.replace("\r\n", "\n").split("\n") + [""]:
                 if line.startswith("data:"):
+                    buf.append(line[5:].lstrip())
+                elif line == "" and buf:
                     try:
-                        j = json.loads(line[5:].strip())
+                        msgs.append(json.loads("\n".join(buf)))
                     except ValueError:
-                        continue
-                    if j.get("id") == payload["id"]:
-                        return j
-            raise PublishError("CONNECT_MCP_NO_RESPONSE")
-        return r.json()
+                        pass
+                    buf = []
+        else:
+            try:
+                j = r.json()
+                msgs = j if isinstance(j, list) else [j]
+            except ValueError:
+                pass
+        for j in msgs:
+            if isinstance(j, dict) and str(j.get("id")) == str(payload["id"]):
+                return j
+        for j in msgs:
+            if isinstance(j, dict) and ("result" in j or "error" in j):
+                return j
+        raise PublishError(f"CONNECT_MCP_NO_RESPONSE status={r.status_code} type={ctype[:40]} "
+                           f"len={len(r.text)} head={r.text[:150]!r}")
 
     def _rpc(self, method: str, params: dict, timeout: int = 300) -> dict:
         self.n += 1
