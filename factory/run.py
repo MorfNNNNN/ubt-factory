@@ -131,7 +131,16 @@ def preflight() -> bool:
     key = os.environ.get("COMPOSIO_API_KEY") or ""
     print(f"preflight: RELEASE_ENABLED={os.environ.get('RELEASE_ENABLED')!r}", flush=True)
     print(f"preflight: COMPOSIO_API_KEY present={bool(key)} len={len(key)} "
-          f"starts_ak_={key.startswith('ak_')}", flush=True)
+          f"starts_ak_={key.startswith('ak_')} type_marker={(key.split('_')[0] + '_') if '_' in key[:5] else 'none'}", flush=True)
+    if key:
+        for hdr in ("x-user-api-key", "Authorization"):
+            try:
+                v = ("Bearer " + key) if hdr == "Authorization" else key
+                rr = requests.get("https://backend.composio.dev/api/v3/auth/session/info", headers={hdr: v}, timeout=20)
+                rr2 = requests.get(COMPOSIO_URL, headers={hdr: v}, params={"limit": 1}, timeout=20)
+                print(f"preflight: diag header={hdr} session_info={rr.status_code} accounts={rr2.status_code}", flush=True)
+            except Exception as e:
+                print("preflight diag error:", safe_error(e), flush=True)
     code, items = composio_inventory()
     INVENTORY[:] = items
     print(f"preflight: composio inventory http={code} active_accounts={len(items)} "
