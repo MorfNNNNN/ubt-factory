@@ -241,6 +241,7 @@ def upload_media(script_id: str, workdir: Path, claim_token: str) -> None:
 
 
 PUBLISHED: list = []
+FAILED: list = []
 
 
 def process_one(no_publish: bool) -> bool:
@@ -252,6 +253,14 @@ def process_one(no_publish: bool) -> bool:
     print(f"claimed {script['id']} project={script.get('project')}", flush=True)
     # Slim queue rows carry beats only; captions are rebuilt deterministically here.
     script = enrich_script(script, TOPICS)
+    if not no_publish:
+        _skip = {k for k, v in json.loads(os.environ.get("FORMATS_OVERRIDE") or "{}").items() if v == "skip"} \
+            if (os.environ.get("FORMATS_OVERRIDE") or "").strip().startswith("{") else set()
+        if not [a for a in accounts if a.get("platform") not in _skip]:
+            print("no accounts eligible right now (daily caps / pauses) - nothing to publish, not rendering", flush=True)
+            api("POST", "/f/report", json={"script": script["id"], "claim_token": lease,
+                "results": [], "done": True, "rendered": False})
+            return False
     want_project = os.environ.get("DEFAULT_PROJECT")
     if want_project and script.get("project") != want_project:
         report([], done=True)
@@ -287,6 +296,7 @@ def process_one(no_publish: bool) -> bool:
                 res = publish_all(accounts, script, media, ctx, before_publish=reserve,
                                   on_result=lambda result: report([result]))
                 PUBLISHED.extend(r for r in res if r.get("state") in ("posted", "accepted"))
+                FAILED.extend(r for r in res if r.get("state") not in ("posted", "accepted"))
     except Exception as e:
         # Do not invent failures for accounts never attempted, or overwrite receipts.
         print("pipeline error:", safe_error(e), flush=True)
@@ -332,7 +342,7 @@ def main() -> None:
         done += 1
         time.sleep(5)
     print(f"finished: {done} script(s) processed, {len(PUBLISHED)} publication(s)", flush=True)
-    if not args.render_only and done and not PUBLISHED:
+    if not args.render_only and done and not PUBLISHED and FAILED:
         raise SystemExit("publishing run produced zero publications - failing loudly")
 
 
