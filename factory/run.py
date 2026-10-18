@@ -270,6 +270,12 @@ def process_one(no_publish: bool) -> bool:
             if not no_publish:
                 media = Media(workdir, script["id"], WORKER + "/m/")
                 plan = daily_plan(__import__("datetime").date.today())
+                try:
+                    plan.update(json.loads(os.environ.get("FORMATS_OVERRIDE") or "{}"))
+                except ValueError:
+                    print("::warning::FORMATS_OVERRIDE is not valid JSON; ignored", flush=True)
+                skip = {k for k, v in plan.items() if v == "skip"}
+                accounts = [a for a in accounts if a.get("platform") not in skip]
                 print(f"daily plan: {plan}", flush=True)
                 ctx = Ctx(os.environ.get("COMPOSIO_API_KEY"),
                           os.environ.get("COMPOSIO_USER_ID") or _DISCOVERED_USER_ID or "ubt-factory",
