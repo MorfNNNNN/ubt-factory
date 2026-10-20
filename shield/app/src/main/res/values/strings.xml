@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Семейный щит</string>
+    <string name="simple_home_label">Простой экран</string>
+    <string name="sos_widget_label">SOS — Семейный щит</string>
+    <string name="accessibility_label">Семейный щит: контроль приложений и защита от мошенников</string>
+    <string name="notification_listener_label">Семейный щит: проверка сообщений на мошенничество</string>
+    <string name="accessibility_description">«Семейный щит» узнаёт, какое приложение открыто на экране. Это нужно, чтобы:\n• на телефоне ребёнка соблюдать лимиты и расписание, которые установили родители, и защищать настройки приложения от отключения;\n• на телефоне пожилого родственника предупреждать, когда во время разговора с незнакомым номером открывается банк, установка приложения или программа удалённого доступа.\nСодержимое экрана не сохраняется и не передаётся. На сервер ничего не отправляется — семье приходят только зашифрованные предупреждения.</string>
+    <string name="device_admin_description">Защищает «Семейный щит» от удаления без ведома семьи. Отключение администратора возможно в любой момент, при этом близкие получат уведомление.</string>
+    <string name="shortcut_sos">SOS</string>
+    <string name="shortcut_sos_long">Вызвать помощь (SOS)</string>
+    <string name="shortcut_check">Проверить сообщение</string>
+    <string name="shortcut_check_long">Проверить номер, ссылку или сообщение</string>
+</resources>

@@ -168,7 +168,27 @@ data class ChildPolicy(
     val blockAppStoresDuringLimits: Boolean = true,
     val sosContacts: List<TrustedContact> = emptyList(),
     val warnBeforeLimitMinutes: Int = 5,
+    /** Lets a parent temporarily unlock protected settings on the child's phone. */
+    val parentPin: PinHash? = null,
 )
+
+@Serializable
+data class PinHash(val salt: String, val hash: String, val iterations: Int = 20_000) {
+    fun matches(pin: String): Boolean = compute(pin, salt, iterations) == hash
+
+    companion object {
+        fun create(pin: String): PinHash {
+            val salt = ru.ubt.familyshield.shared.crypto.B64.encode(ru.ubt.familyshield.shared.crypto.Rng.bytes(16))
+            return PinHash(salt, compute(pin, salt, 20_000))
+        }
+
+        private fun compute(pin: String, salt: String, iterations: Int): String {
+            val spec = javax.crypto.spec.PBEKeySpec(pin.toCharArray(), salt.toByteArray(), iterations, 256)
+            val bytes = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1").generateSecret(spec).encoded
+            return ru.ubt.familyshield.shared.crypto.B64.encode(bytes)
+        }
+    }
+}
 
 @Serializable
 data class CallShieldSettings(

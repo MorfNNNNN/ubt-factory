@@ -41,6 +41,8 @@ data class MemberProfile(
     val deviceModel: String = "",
     val androidVersion: Int = 0,
     val appVersion: String = "",
+    /** Guardian's phone number for SOS and "call family" buttons. Never sent to the server in clear text. */
+    val phone: String? = null,
 )
 
 @Serializable

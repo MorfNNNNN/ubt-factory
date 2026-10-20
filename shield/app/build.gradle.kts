@@ -39,6 +39,7 @@ android {
         resValue("string", "rustore_console_app_id", rustoreConsoleAppId)
         resValue("string", "rustore_push_project_id", rustorePushProjectId)
         manifestPlaceholders["payScheme"] = "familyshieldpay"
+        resValue("string", "pay_scheme", "familyshieldpay")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
@@ -60,6 +61,7 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             manifestPlaceholders["payScheme"] = "familyshieldpaydebug"
+            resValue("string", "pay_scheme", "familyshieldpaydebug")
         }
         release {
             isMinifyEnabled = true
@@ -87,6 +89,11 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.isReturnDefaultValues = true
+        unitTests.all {
+            // Robolectric downloads its runtime jars directly; route it through the Central mirror.
+            it.systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2")
+            it.systemProperty("robolectric.dependency.repo.id", "central-mirror")
+        }
     }
 
     lint {
@@ -135,7 +142,6 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.okhttp)
-    implementation(libs.tink.android)
     implementation(libs.zxing.embedded)
 
     implementation(platform(libs.rustore.bom))

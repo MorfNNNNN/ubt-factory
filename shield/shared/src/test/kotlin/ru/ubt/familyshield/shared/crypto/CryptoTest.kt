@@ -88,3 +88,12 @@ class CryptoTest {
         assertNotNull(PairingCode.parse("https://family.example/pair#i=0123456789&k=ABCDEFGHJKMNPQRS"))
     }
 }
+
+class PinHashTest {
+    @org.junit.Test
+    fun pinHashVerifies() {
+        val pin = ru.ubt.familyshield.shared.model.PinHash.create("2580")
+        org.junit.Assert.assertTrue(pin.matches("2580"))
+        org.junit.Assert.assertFalse(pin.matches("0000"))
+    }
+}

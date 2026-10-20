@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_stat_shield"
+        android:shortcutId="sos"
+        android:shortcutLongLabel="@string/shortcut_sos_long"
+        android:shortcutShortLabel="@string/shortcut_sos">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="ru.ubt.familyshield.protect.ui.SosActivity"
+            android:targetPackage="ru.ubt.familyshield" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_stat_shield"
+        android:shortcutId="check"
+        android:shortcutLongLabel="@string/shortcut_check_long"
+        android:shortcutShortLabel="@string/shortcut_check">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="ru.ubt.familyshield.ui.MainActivity"
+            android:targetPackage="ru.ubt.familyshield">
+            <extra android:name="route" android:value="check" />
+        </intent>
+    </shortcut>
+</shortcuts>
