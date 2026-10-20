@@ -1,0 +1,53 @@
+# Production stack: PostgreSQL + relay server + Caddy (automatic HTTPS).
+# Host it in a Russian data centre (Yandex Cloud, Selectel, VK Cloud...) to comply with 152-FZ
+# data localisation. Usage: cp .env.example .env && edit && docker compose up -d
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: shield
+      POSTGRES_USER: shield
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shield -d shield"]
+      interval: 10s
+      retries: 5
+
+  server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/shield
+      DATABASE_USER: shield
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      TRUST_X_FORWARDED_FOR: "true"
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [server]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SHIELD_DOMAIN: ${SHIELD_DOMAIN:?set SHIELD_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

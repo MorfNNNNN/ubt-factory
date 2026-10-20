@@ -1,0 +1,11 @@
+{$SHIELD_DOMAIN} {
+	encode gzip
+	request_body {
+		max_size 1MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	reverse_proxy server:8080
+}
