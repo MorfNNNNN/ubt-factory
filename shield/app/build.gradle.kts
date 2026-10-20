@@ -21,6 +21,7 @@ val serverUrl = cfg("shield.serverUrl", "SHIELD_SERVER_URL", "https://api.family
 val rustoreConsoleAppId = cfg("shield.rustoreConsoleAppId", "RUSTORE_CONSOLE_APP_ID", "0")
 val rustorePushProjectId = cfg("shield.rustorePushProjectId", "RUSTORE_PUSH_PROJECT_ID", "")
 val entitlementPublicKey = cfg("shield.entitlementPublicKey", "SHIELD_ENTITLEMENT_PUBLIC_KEY", "")
+val supportEmail = cfg("shield.supportEmail", "SHIELD_SUPPORT_EMAIL", "")
 
 android {
     namespace = "ru.ubt.familyshield"
@@ -36,6 +37,7 @@ android {
         buildConfigField("String", "SERVER_URL", "\"$serverUrl\"")
         buildConfigField("String", "ENTITLEMENT_PUBLIC_KEY", "\"$entitlementPublicKey\"")
         buildConfigField("String", "RUSTORE_PUSH_PROJECT_ID", "\"$rustorePushProjectId\"")
+        buildConfigField("String", "SUPPORT_EMAIL", "\"$supportEmail\"")
         resValue("string", "rustore_console_app_id", rustoreConsoleAppId)
         resValue("string", "rustore_push_project_id", rustorePushProjectId)
         manifestPlaceholders["payScheme"] = "familyshieldpay"

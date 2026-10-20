@@ -1,0 +1,98 @@
+name: family-shield
+on:
+  push:
+    paths:
+      - "shield/**"
+      - ".github/workflows/shield.yml"
+  pull_request:
+    paths:
+      - "shield/**"
+      - ".github/workflows/shield.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: family-shield-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: shield
+
+jobs:
+  shared-and-server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SHIELD_SERVER_ONLY: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Tests (shared engines + server)
+        run: ./gradlew --no-daemon :shared:test :server:test
+      - name: Server jar
+        run: ./gradlew --no-daemon :server:fatJar
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shared-server-test-reports
+          path: |
+            shield/shared/build/reports/tests
+            shield/server/build/reports/tests
+      - uses: actions/upload-artifact@v4
+        with:
+          name: family-shield-server
+          path: shield/server/build/libs/family-shield-server.jar
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - name: Android platform
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Release signing (optional)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SHIELD_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/shield.jks"
+            echo "SHIELD_STORE_FILE=$RUNNER_TEMP/shield.jks" >> "$GITHUB_ENV"
+          else
+            echo "No keystore secret: release APK will be signed with the debug key."
+          fi
+      - name: Unit tests, lint, release build
+        env:
+          SHIELD_STORE_PASSWORD: ${{ secrets.SHIELD_STORE_PASSWORD }}
+          SHIELD_KEY_ALIAS: ${{ secrets.SHIELD_KEY_ALIAS }}
+          SHIELD_KEY_PASSWORD: ${{ secrets.SHIELD_KEY_PASSWORD }}
+          SHIELD_SERVER_URL: ${{ vars.SHIELD_SERVER_URL }}
+          SHIELD_ENTITLEMENT_PUBLIC_KEY: ${{ vars.SHIELD_ENTITLEMENT_PUBLIC_KEY }}
+          RUSTORE_CONSOLE_APP_ID: ${{ vars.RUSTORE_CONSOLE_APP_ID }}
+          RUSTORE_PUSH_PROJECT_ID: ${{ vars.RUSTORE_PUSH_PROJECT_ID }}
+          SHIELD_SUPPORT_EMAIL: ${{ vars.SHIELD_SUPPORT_EMAIL }}
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleRelease :app:bundleRelease
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-reports
+          path: |
+            shield/app/build/reports
+      - uses: actions/upload-artifact@v4
+        with:
+          name: family-shield-release
+          path: |
+            shield/app/build/outputs/apk/release/*.apk
+            shield/app/build/outputs/bundle/release/*.aab

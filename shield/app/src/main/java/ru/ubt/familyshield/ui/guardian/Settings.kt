@@ -56,6 +56,7 @@ fun GuardianSettings(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var leaveDialog by remember { mutableStateOf(false) }
+    var profileDialog by remember { mutableStateOf(false) }
     val tier = graph.entitlements.tier
 
     ScreenScaffold(title = "Ещё") { padding ->
@@ -76,7 +77,7 @@ fun GuardianSettings(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState)
             }
 
             SectionCard(title = "Профиль") {
-                NavRow("Имя и телефон", subtitle = state.settings.displayName.ifBlank { "Не указано" }, emoji = "👤") { }
+                NavRow("Имя и телефон", subtitle = listOf(state.settings.displayName, state.settings.phone).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Не указано" }, emoji = "👤") { profileDialog = true }
             }
 
             SectionCard(title = "О приложении и помощь") {
@@ -100,6 +101,36 @@ fun GuardianSettings(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState)
             Text("Версия ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
             Gap(24.dp)
         }
+    }
+
+    if (profileDialog) {
+        var name by remember { mutableStateOf(state.settings.displayName) }
+        var phone by remember { mutableStateOf(state.settings.phone) }
+        AlertDialog(
+            onDismissRequest = { profileDialog = false },
+            title = { Text("Профиль") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.OutlinedTextField(name, { name = it.take(40) }, label = { Text("Имя") }, singleLine = true)
+                    androidx.compose.material3.OutlinedTextField(
+                        phone, { phone = it.take(20) }, label = { Text("Телефон для SOS") }, singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone),
+                    )
+                    Text("Телефон видят только члены вашей семьи — для кнопок SOS и «Позвонить родным».", style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    profileDialog = false
+                    scope.launch {
+                        graph.settings.setProfile(name, state.settings.avatar)
+                        graph.settings.setPhone(phone)
+                        graph.sync.send(ru.ubt.familyshield.shared.protocol.FamilyPayload.Profile(graph.family.myProfile()), ru.ubt.familyshield.shared.protocol.Audience.ALL, emptyList(), false, null)
+                    }
+                }) { Text("Сохранить") }
+            },
+            dismissButton = { TextButton(onClick = { profileDialog = false }) { Text("Отмена") } },
+        )
     }
 
     if (leaveDialog) {
