@@ -10,10 +10,6 @@ on:
       - ".github/workflows/shield.yml"
   workflow_dispatch:
 
-concurrency:
-  group: family-shield-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
@@ -25,6 +21,9 @@ jobs:
   shared-and-server:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    concurrency:
+      group: family-shield-server-${{ github.ref }}
+      cancel-in-progress: true
     permissions:
       contents: write # rolling "server-latest" release used by deploy/install.sh
     env:
@@ -68,6 +67,9 @@ jobs:
   android:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    concurrency:
+      group: family-shield-android-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -111,3 +113,55 @@ jobs:
           path: |
             shield/app/build/outputs/apk/release/*.apk
             shield/app/build/outputs/bundle/release/*.aab
+
+  # Installs or updates the production server over SSH with deploy/install.sh, after the
+  # server jar for this commit is published. Needs the SERVER_PASSWORD (or SERVER_SSH_KEY)
+  # secret; host and domain can be overridden with the SERVER_HOST / SHIELD_DOMAIN variables.
+  deploy:
+    needs: shared-and-server
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/cool-gates-wyu9vs')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: family-shield-deploy
+      cancel-in-progress: false
+    env:
+      SERVER_HOST: ${{ vars.SERVER_HOST || '188.120.246.123' }}
+      SERVER_USER: ${{ vars.SERVER_USER || 'root' }}
+      SHIELD_DOMAIN: ${{ vars.SHIELD_DOMAIN || 'familyapp1.ru' }}
+      SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+      SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install / update the server
+        run: |
+          if [ -z "$SERVER_PASSWORD$SERVER_SSH_KEY" ]; then
+            echo "::warning::Deploy skipped: add the SERVER_PASSWORD secret (Settings → Secrets and variables → Actions)."
+            exit 0
+          fi
+          ssh_opts=(-o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ConnectTimeout=20)
+          if [ -n "$SERVER_SSH_KEY" ]; then
+            install -m 600 /dev/null ~/.ssh_deploy_key
+            printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh_deploy_key
+            run() { ssh "${ssh_opts[@]}" -i ~/.ssh_deploy_key "$SERVER_USER@$SERVER_HOST" "$@"; }
+          else
+            sudo apt-get install -y -qq sshpass >/dev/null
+            export SSHPASS="$SERVER_PASSWORD"
+            run() { sshpass -e ssh "${ssh_opts[@]}" -o PubkeyAuthentication=no "$SERVER_USER@$SERVER_HOST" "$@"; }
+          fi
+          run "cat > /root/family-shield-install.sh" < deploy/install.sh
+          run "SHIELD_BRANCH='$GITHUB_REF_NAME' bash /root/family-shield-install.sh '$SHIELD_DOMAIN' < /dev/null"
+      - name: Check from the internet
+        if: env.SERVER_PASSWORD != '' || env.SERVER_SSH_KEY != ''
+        run: |
+          echo "DNS A $SHIELD_DOMAIN: $(dig +short A "$SHIELD_DOMAIN" | tr '\n' ' ')"
+          for _ in $(seq 1 12); do
+            if curl -fsS --max-time 10 "https://$SHIELD_DOMAIN/health"; then
+              echo
+              echo "Entitlement public key: $(curl -fsS "https://$SHIELD_DOMAIN/v1/billing/public-key")"
+              curl -fsS -o /dev/null -w "privacy page: %{http_code}\n" "https://$SHIELD_DOMAIN/privacy"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::warning::https://$SHIELD_DOMAIN is not reachable yet (DNS records or HTTPS certificate pending)."

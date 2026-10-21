@@ -33,7 +33,9 @@
 - [x] Домен `familyapp1.ru` и VPS FirstVDS (188.120.246.123).
 - [ ] DNS (панель FirstVDS): записи A `familyapp1.ru` и `www.familyapp1.ru` →
       188.120.246.123.
-- [ ] На сервере от root:
+- [ ] Секрет GitHub `SERVER_PASSWORD` (пароль root) — тогда сервер ставится и
+      обновляется автоматически задачей `deploy` в GitHub Actions.
+      Или вручную на сервере от root:
       `curl -fsSL https://raw.githubusercontent.com/MorfNNNNN/ubt-factory/claude/cool-gates-wyu9vs/shield/deploy/install.sh | bash -s -- familyapp1.ru`
 - [ ] Проверить `https://familyapp1.ru/health`, `/privacy`, `/terms`.
 - [ ] Публичный ключ из вывода установщика (или
@@ -42,7 +44,8 @@
       менять**, иначе установленные приложения перестанут принимать тариф.
 - [ ] Скопировать `/opt/family-shield/shield/deploy/.env` в надёжное место
       (пароль БД и приватный ключ подписи тарифов).
-- [ ] Сменить пароль root (`passwd`), лучше перейти на вход по SSH-ключу.
+- [ ] Сменить пароль root (`passwd`) и обновить секрет `SERVER_PASSWORD`,
+      а лучше перейти на вход по SSH-ключу (секрет `SERVER_SSH_KEY`).
 - [ ] RuStore Консоль → API RuStore → создать ключ (доступ к платежам и
       подпискам) → `RUSTORE_KEY_ID`, `RUSTORE_PRIVATE_KEY` в `.env`.
 - [ ] RuStore Консоль → Push-уведомления → проект →

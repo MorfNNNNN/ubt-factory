@@ -115,6 +115,14 @@ curl -fsSL https://raw.githubusercontent.com/MorfNNNNN/ubt-factory/claude/cool-g
 берётся из релиза `server-latest`, который публикует CI; если его нет —
 сервер собирается из исходников.
 
+Через GitHub (без ручного входа на сервер): задача `deploy` в
+`.github/workflows/shield.yml` после каждой отправки в `main` или рабочую
+ветку подключается к серверу по SSH и запускает тот же установщик. Нужен
+секрет репозитория `SERVER_PASSWORD` (пароль root) или `SERVER_SSH_KEY`
+(закрытый ключ); адрес и домен — `188.120.246.123` и `familyapp1.ru`, их можно
+переопределить переменными `SERVER_HOST`, `SHIELD_DOMAIN`. Результат —
+в журнале задачи `deploy` на вкладке Actions.
+
 Вручную: `cd shield/deploy && cp .env.example .env`, заполнить,
 `docker compose run --rm server keygen`, `docker compose up -d`.
 
