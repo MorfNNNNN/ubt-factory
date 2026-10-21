@@ -13,7 +13,9 @@ flock -n 9 || exit 0
 state_file=/var/lib/family-shield/update-state
 head=$(git -C "$DIR" ls-remote origin "refs/heads/$BRANCH" | cut -f1)
 [ -n "$head" ] || exit 0
-jar=$(curl -fsSIL "$JAR_URL" 2>/dev/null | tr -d '\r' | awk 'tolower($1) == "etag:" { e = $2 } END { print e }')
+# Release assets refuse HEAD requests; a one-byte ranged GET returns the same ETag.
+jar=$(curl -fsSL -r 0-0 -D - -o /dev/null "$JAR_URL" 2>/dev/null | tr -d '\r' |
+  awk 'tolower($1) == "etag:" { e = $2 } END { print e }')
 state="$head $jar"
 mkdir -p "$(dirname "$state_file")"
 
