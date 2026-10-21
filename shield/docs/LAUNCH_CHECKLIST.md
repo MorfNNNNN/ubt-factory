@@ -24,27 +24,35 @@
 
 ## 1. Юридическое
 - [ ] ИП или ООО; уведомление в Роскомнадзор как оператор персональных данных.
-- [ ] Заполнить реквизиты в `docs/PRIVACY.md` и `docs/TERMS.md`, опубликовать
-      на своём сайте (нужны ссылки для RuStore).
+- [ ] Заполнить реквизиты в `docs/PRIVACY.md` и `docs/TERMS.md` — сайт
+      показывает их по адресам https://familyapp1.ru/privacy и /terms
+      (после правки — повторный запуск установщика).
 - [ ] Указать e-mail поддержки при сборке (`shield.supportEmail`).
 
 ## 2. Сервер
-- [ ] Домен и VPS в российском дата-центре (Yandex Cloud, Selectel, VK Cloud,
-      Timeweb…), Docker.
-- [ ] `cd shield/deploy && cp .env.example .env`, заполнить домен и пароль БД.
-- [ ] `docker compose run --rm server keygen` → `ENTITLEMENT_PRIVATE_KEY`,
-      `ENTITLEMENT_PUBLIC_KEY` в `.env`; **публичный ключ** — в сборку
-      приложения (`shield.entitlementPublicKey`). Приватный ключ хранить в
-      секрете и сделать резервную копию.
+- [x] Домен `familyapp1.ru` и VPS FirstVDS (188.120.246.123).
+- [ ] DNS (панель FirstVDS): записи A `familyapp1.ru` и `www.familyapp1.ru` →
+      188.120.246.123.
+- [ ] На сервере от root:
+      `curl -fsSL https://raw.githubusercontent.com/MorfNNNNN/ubt-factory/claude/cool-gates-wyu9vs/shield/deploy/install.sh | bash -s -- familyapp1.ru`
+- [ ] Проверить `https://familyapp1.ru/health`, `/privacy`, `/terms`.
+- [ ] Публичный ключ из вывода установщика (или
+      `https://familyapp1.ru/v1/billing/public-key`) — в сборку приложения
+      (`shield.entitlementPublicKey`). Ключ на сервере после этого **не
+      менять**, иначе установленные приложения перестанут принимать тариф.
+- [ ] Скопировать `/opt/family-shield/shield/deploy/.env` в надёжное место
+      (пароль БД и приватный ключ подписи тарифов).
+- [ ] Сменить пароль root (`passwd`), лучше перейти на вход по SSH-ключу.
 - [ ] RuStore Консоль → API RuStore → создать ключ (доступ к платежам и
-      подпискам) → `RUSTORE_KEY_ID`, `RUSTORE_PRIVATE_KEY`.
+      подпискам) → `RUSTORE_KEY_ID`, `RUSTORE_PRIVATE_KEY` в `.env`.
 - [ ] RuStore Консоль → Push-уведомления → проект →
-      `RUSTORE_PUSH_PROJECT_ID`, `RUSTORE_PUSH_SERVICE_TOKEN`; project ID —
-      также в сборку (`shield.rustorePushProjectId`).
+      `RUSTORE_PUSH_PROJECT_ID`, `RUSTORE_PUSH_SERVICE_TOKEN` в `.env`;
+      project ID — также в сборку (`shield.rustorePushProjectId`).
+- [ ] После правки `.env`: `cd /opt/family-shield/shield/deploy && docker compose up -d`.
 - [ ] По желанию: `THREAT_FEEDS` — списки доменов для категорий фильтра
       (проверьте лицензию каждого списка).
-- [ ] `docker compose up -d`, проверить `https://ваш-домен/health`.
-- [ ] Резервное копирование PostgreSQL.
+- [ ] Резервные копии базы делаются ежедневно в `/var/backups/family-shield` —
+      периодически копируйте их за пределы сервера.
 
 ## 3. Консоль RuStore
 - [ ] Создать приложение с пакетом `ru.ubt.familyshield`, получить
@@ -63,7 +71,7 @@
       shield.storePassword=…
       shield.keyAlias=shield
       shield.keyPassword=…
-      shield.serverUrl=https://api.ваш-домен.ru
+      shield.serverUrl=https://familyapp1.ru
       shield.entitlementPublicKey=…
       shield.rustoreConsoleAppId=…
       shield.rustorePushProjectId=…

@@ -83,7 +83,7 @@ SHIELD_SERVER_ONLY=true ./gradlew :server:fatJar
 
 | Свойство | Переменная | Назначение |
 |---|---|---|
-| `shield.serverUrl` | `SHIELD_SERVER_URL` | адрес сервера, напр. `https://api.ваш-домен.ru` |
+| `shield.serverUrl` | `SHIELD_SERVER_URL` | адрес сервера, по умолчанию `https://familyapp1.ru` |
 | `shield.entitlementPublicKey` | `SHIELD_ENTITLEMENT_PUBLIC_KEY` | публичный ключ сервера для проверки тарифа |
 | `shield.rustoreConsoleAppId` | `RUSTORE_CONSOLE_APP_ID` | ID приложения в консоли RuStore (Pay SDK) |
 | `shield.rustorePushProjectId` | `RUSTORE_PUSH_PROJECT_ID` | проект push-уведомлений RuStore |
@@ -96,12 +96,27 @@ SHIELD_SERVER_ONLY=true ./gradlew :server:fatJar
 
 ## Сервер
 
+Рабочий адрес: **https://familyapp1.ru** — API (`/v1/…`, `/health`) и сайт с
+политикой (`/privacy`) и соглашением (`/terms`) на одном домене. Нужны записи
+DNS типа A для `familyapp1.ru` и `www.familyapp1.ru` → IP сервера.
+
+Установка и обновление на чистом Ubuntu/Debian (от root):
+
 ```bash
-cd shield/deploy
-cp .env.example .env            # заполните домен, пароль БД, ключи RuStore
-docker compose run --rm server keygen   # ENTITLEMENT_PRIVATE_KEY / PUBLIC_KEY
-docker compose up -d
+curl -fsSL https://raw.githubusercontent.com/MorfNNNNN/ubt-factory/claude/cool-gates-wyu9vs/shield/deploy/install.sh | bash -s -- familyapp1.ru
 ```
+
+Скрипт ставит Docker, забирает код в `/opt/family-shield`, создаёт
+`deploy/.env` с паролем БД и ключом подписи тарифов (при повторном запуске
+сохраняются), запускает PostgreSQL + сервер + Caddy (HTTPS-сертификат
+выпускается сам), включает ежедневные копии базы в
+`/var/backups/family-shield` и печатает публичный ключ для сборки приложения
+(он же доступен по адресу `/v1/billing/public-key`). Готовый jar сервера
+берётся из релиза `server-latest`, который публикует CI; если его нет —
+сервер собирается из исходников.
+
+Вручную: `cd shield/deploy && cp .env.example .env`, заполнить,
+`docker compose run --rm server keygen`, `docker compose up -d`.
 
 Размещайте сервер в российском дата-центре (152-ФЗ). Подробности —
 `docs/LAUNCH_CHECKLIST.md`.

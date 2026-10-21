@@ -1,6 +1,8 @@
 # Production stack: PostgreSQL + relay server + Caddy (automatic HTTPS).
 # Host it in a Russian data centre (Yandex Cloud, Selectel, VK Cloud...) to comply with 152-FZ
-# data localisation. Usage: cp .env.example .env && edit && docker compose up -d
+# data localisation. Usage: ./install.sh <domain>, or cp .env.example .env && edit && docker compose up -d
+name: family-shield
+
 services:
   db:
     image: postgres:16-alpine
@@ -19,7 +21,8 @@ services:
   server:
     build:
       context: ..
-      dockerfile: server/Dockerfile
+      # install.sh switches to server/Dockerfile.prebuilt when the CI-built jar is available.
+      dockerfile: ${SERVER_DOCKERFILE:-server/Dockerfile}
     restart: unless-stopped
     depends_on:
       db:
@@ -44,6 +47,8 @@ services:
       SHIELD_DOMAIN: ${SHIELD_DOMAIN:?set SHIELD_DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv/site:ro
+      - ../docs:/srv/docs:ro
       - caddy_data:/data
       - caddy_config:/config
 

@@ -1,11 +1,35 @@
+# One host serves both the API (/v1/*, /health) and the public site with the
+# privacy policy and terms that RuStore links to. Caddy obtains and renews the
+# HTTPS certificate automatically once the domain's A record points here.
 {$SHIELD_DOMAIN} {
 	encode gzip
-	request_body {
-		max_size 1MB
-	}
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		-Server
 	}
-	reverse_proxy server:8080
+
+	@api path /v1/* /health
+	handle @api {
+		request_body {
+			max_size 1MB
+		}
+		reverse_proxy server:8080
+	}
+
+	handle {
+		root * /srv/site
+		respond /_* 404
+		redir /PRIVACY.md /privacy
+		redir /TERMS.md /terms
+		# Pages pull shared partials from /srv/site and the policy texts from /srv/docs.
+		templates {
+			root /srv
+		}
+		try_files {path} {path}.html {path}/index.html
+		file_server
+	}
+}
+
+www.{$SHIELD_DOMAIN} {
+	redir https://{$SHIELD_DOMAIN}{uri} permanent
 }

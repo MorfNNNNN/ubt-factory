@@ -15,6 +15,7 @@ object ApiPaths {
     const val ACK = "/v1/messages/ack"
     const val VERIFY_PURCHASE = "/v1/billing/verify"
     const val ENTITLEMENT = "/v1/billing/entitlement"
+    const val ENTITLEMENT_PUBLIC_KEY = "/v1/billing/public-key"
     const val THREAT_NUMBERS = "/v1/threats/numbers"
     const val REPORT_NUMBER = "/v1/threats/numbers/report"
     const val THREAT_DOMAINS = "/v1/threats/domains"

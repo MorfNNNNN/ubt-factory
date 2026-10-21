@@ -131,6 +131,7 @@ class ServerTest {
     @Test
     fun healthAndAuthRequired() = app {
         assertEquals(HttpStatusCode.OK, client.get(ApiPaths.HEALTH).status)
+        assertTrue(client.get(ApiPaths.ENTITLEMENT_PUBLIC_KEY).bodyAsText().isNotBlank())
         val r = client.get(ApiPaths.MEMBERS)
         assertEquals(HttpStatusCode.Unauthorized, r.status)
         assertEquals(HttpStatusCode.Unauthorized, client.get(ApiPaths.MEMBERS) { bearerAuth("forged") }.status)

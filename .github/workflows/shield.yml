@@ -25,6 +25,8 @@ jobs:
   shared-and-server:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write # rolling "server-latest" release used by deploy/install.sh
     env:
       SHIELD_SERVER_ONLY: "true"
     steps:
@@ -49,6 +51,19 @@ jobs:
         with:
           name: family-shield-server
           path: shield/server/build/libs/family-shield-server.jar
+      - name: Publish server jar for deploy/install.sh
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/cool-gates-wyu9vs')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          jar=server/build/libs/family-shield-server.jar
+          notes="Server jar built from ${GITHUB_SHA} (${GITHUB_REF_NAME}). Downloaded by shield/deploy/install.sh."
+          if gh release view server-latest >/dev/null 2>&1; then
+            gh release upload server-latest "$jar" --clobber
+            gh release edit server-latest --notes "$notes"
+          else
+            gh release create server-latest "$jar" --prerelease --target "$GITHUB_SHA" --title "Family Shield server" --notes "$notes"
+          fi
 
   android:
     runs-on: ubuntu-latest
@@ -60,8 +75,8 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: android-actions/setup-android@v3
-      - name: Android platform
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        with:
+          packages: "platform-tools platforms;android-36 build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v4
       - name: Release signing (optional)
         env:

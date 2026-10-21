@@ -17,7 +17,7 @@ val keystoreProps = Properties().apply {
 fun cfg(name: String, env: String, default: String): String =
     (project.findProperty(name) as String?) ?: System.getenv(env) ?: keystoreProps.getProperty(name) ?: default
 
-val serverUrl = cfg("shield.serverUrl", "SHIELD_SERVER_URL", "https://api.family-shield.invalid")
+val serverUrl = cfg("shield.serverUrl", "SHIELD_SERVER_URL", "https://familyapp1.ru")
 val rustoreConsoleAppId = cfg("shield.rustoreConsoleAppId", "RUSTORE_CONSOLE_APP_ID", "0")
 val rustorePushProjectId = cfg("shield.rustorePushProjectId", "RUSTORE_PUSH_PROJECT_ID", "")
 val entitlementPublicKey = cfg("shield.entitlementPublicKey", "SHIELD_ENTITLEMENT_PUBLIC_KEY", "")

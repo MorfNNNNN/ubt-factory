@@ -1,0 +1,10 @@
+# Runtime-only image around a jar built by CI (deploy/install.sh downloads it to deploy/prebuilt/).
+# Build context: the shield/ directory, same as server/Dockerfile.
+FROM eclipse-temurin:21-jre
+RUN useradd --system --uid 10001 shield && mkdir -p /app && chown shield /app
+COPY deploy/prebuilt/family-shield-server.jar /app/server.jar
+USER shield
+WORKDIR /app
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://127.0.0.1:8080/health || exit 1
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/server.jar"]

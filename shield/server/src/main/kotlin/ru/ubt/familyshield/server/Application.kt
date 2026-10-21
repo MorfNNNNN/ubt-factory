@@ -22,6 +22,7 @@ import io.ktor.server.request.header
 import io.ktor.server.request.path
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.routing.RoutingCall
 import io.ktor.server.routing.delete
@@ -43,6 +44,7 @@ import ru.ubt.familyshield.server.services.PurchaseVerifier
 import ru.ubt.familyshield.server.services.PushSender
 import ru.ubt.familyshield.server.services.ThreatService
 import ru.ubt.familyshield.shared.ShieldJson
+import ru.ubt.familyshield.shared.crypto.B64
 import ru.ubt.familyshield.shared.model.WebCategory
 import ru.ubt.familyshield.shared.protocol.AcceptInviteRequest
 import ru.ubt.familyshield.shared.protocol.AckRequest
@@ -140,6 +142,8 @@ fun Application.shieldModule(services: ShieldServices) {
 
     routing {
         get(ApiPaths.HEALTH) { call.respond(HealthResponse("ok", SERVER_VERSION)) }
+        // Public half of the entitlement signing key, baked into app builds as shield.entitlementPublicKey.
+        get(ApiPaths.ENTITLEMENT_PUBLIC_KEY) { call.respondText(B64.encode(config.entitlementKeys.public.encoded)) }
 
         rateLimit(REGISTER_LIMIT) {
             post(ApiPaths.REGISTER) {

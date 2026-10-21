@@ -1,0 +1,7 @@
+**/build/
+.gradle/
+app/
+apk/
+local.properties
+keystore.properties
+deploy/.env
