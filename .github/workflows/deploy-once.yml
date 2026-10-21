@@ -1,0 +1,88 @@
+name: family-shield-deploy-once
+
+# One-off server install without storing the root password anywhere. The runner makes a
+# throwaway RSA key in memory and pushes its public half as .github/deploy-handoff/<run id>.pub;
+# the operator pushes the password encrypted to it as <run id>.b64. The private key never
+# leaves the runner and dies with it, so the ciphertext left in git history is useless.
+#
+#   openssl pkeyutl -encrypt -pubin -inkey <run id>.pub -pkeyopt rsa_padding_mode:oaep \
+#     -pkeyopt rsa_oaep_md:sha256 | base64 -w0 > .github/deploy-handoff/<run id>.b64
+on:
+  push:
+    branches: [main, claude/cool-gates-wyu9vs]
+    paths: [".github/workflows/deploy-once.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # handoff files on this branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: family-shield-deploy
+      cancel-in-progress: false
+    env:
+      SERVER_HOST: ${{ vars.SERVER_HOST || '188.120.246.123' }}
+      SERVER_USER: ${{ vars.SERVER_USER || 'root' }}
+      SHIELD_DOMAIN: ${{ vars.SHIELD_DOMAIN || 'familyapp1.ru' }}
+      HANDOFF: .github/deploy-handoff/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish a throwaway public key
+        run: |
+          umask 077
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out /dev/shm/handoff.pem 2>/dev/null
+          mkdir -p "$(dirname "$HANDOFF")"
+          openssl pkey -in /dev/shm/handoff.pem -pubout -out "$HANDOFF.pub"
+          cat "$HANDOFF.pub"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$HANDOFF.pub"
+          git commit -q -m "Deploy handoff key for run $GITHUB_RUN_ID"
+          git push -q origin "HEAD:$GITHUB_REF_NAME"
+      - name: Wait for the encrypted password
+        run: |
+          for _ in $(seq 1 120); do
+            if git fetch -q origin "$GITHUB_REF_NAME" && git cat-file -e "FETCH_HEAD:$HANDOFF.b64" 2>/dev/null; then
+              git show "FETCH_HEAD:$HANDOFF.b64" >/dev/shm/handoff.b64
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::$HANDOFF.b64 did not arrive within 30 minutes"
+          exit 1
+      - name: Install the server
+        run: |
+          pw=$(base64 -d /dev/shm/handoff.b64 | openssl pkeyutl -decrypt -inkey /dev/shm/handoff.pem \
+            -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256)
+          echo "::add-mask::$pw"
+          rm -f /dev/shm/handoff.pem /dev/shm/handoff.b64
+          sudo apt-get install -y -qq sshpass >/dev/null
+          export SSHPASS="$pw"
+          unset pw
+          run() {
+            sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ConnectTimeout=20 \
+              -o PubkeyAuthentication=no "$SERVER_USER@$SERVER_HOST" "$@"
+          }
+          run "cat > /root/family-shield-install.sh" <shield/deploy/install.sh
+          run "SHIELD_BRANCH='$GITHUB_REF_NAME' bash /root/family-shield-install.sh '$SHIELD_DOMAIN' </dev/null"
+      - name: Check from the internet
+        run: |
+          echo "DNS A $SHIELD_DOMAIN: $(dig +short A "$SHIELD_DOMAIN" | tr '\n' ' ')"
+          curl -sS -o /dev/null -w "http://$SERVER_HOST (Host: $SHIELD_DOMAIN): %{http_code} -> %{redirect_url}\n" \
+            -H "Host: $SHIELD_DOMAIN" "http://$SERVER_HOST/health" || true
+          curl -fsS --max-time 10 "https://$SHIELD_DOMAIN/health" ||
+            echo "::warning::https://$SHIELD_DOMAIN is not reachable yet (DNS records or HTTPS certificate pending)."
+      - name: Remove handoff files
+        if: always()
+        run: |
+          for _ in 1 2 3; do
+            git fetch -q origin "$GITHUB_REF_NAME" && git checkout -q -B cleanup FETCH_HEAD
+            git rm -q --ignore-unmatch "$HANDOFF.pub" "$HANDOFF.b64"
+            git diff --cached --quiet && exit 0
+            git commit -q -m "Remove deploy handoff files for run $GITHUB_RUN_ID"
+            git push -q origin "HEAD:$GITHUB_REF_NAME" && exit 0
+            sleep 5
+          done
