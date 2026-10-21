@@ -138,6 +138,18 @@ find /var/backups/family-shield -name 'shield-*.sql.gz' -mtime +14 -delete
 EOF
   chmod 755 /etc/cron.daily/family-shield-backup
 
+  # Automatic updates: the server pulls new versions from GitHub (see update.sh).
+  cat >/etc/family-shield.conf <<EOF
+DIR='$DIR'
+BRANCH='$BRANCH'
+DOMAIN='$DOMAIN'
+JAR_URL='$JAR_URL'
+EOF
+  install -m 755 "$DIR/shield/deploy/update.sh" /usr/local/sbin/family-shield-update
+  echo '*/10 * * * * root /usr/local/sbin/family-shield-update >>/var/log/family-shield-update.log 2>&1' \
+    >/etc/cron.d/family-shield-update
+  /usr/local/sbin/family-shield-update --record || warn "не удалось запомнить версию для автообновления"
+
   server_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") print $(i + 1)}' || true)
   dns_ip=$(getent ahostsv4 "$DOMAIN" | awk 'NR == 1 {print $1}' || true)
   if [ -z "$dns_ip" ]; then
@@ -175,7 +187,7 @@ EOF
 Важно:
   • Сохраните копию $DIR/shield/deploy/.env в надёжном месте — там пароль базы и ключ подписи тарифов.
   • Резервные копии базы: /var/backups/family-shield (каждый день, 14 дней).
-  • Обновление — эта же команда ещё раз.
+  • Обновления ставятся сами: сервер каждые 10 минут проверяет GitHub (журнал /var/log/family-shield-update.log).
   • Если пароль root куда-либо пересылался, смените его: passwd
 EOF
 }
