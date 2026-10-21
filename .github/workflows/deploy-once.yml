@@ -59,9 +59,19 @@ jobs:
             -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256)
           echo "::add-mask::$pw"
           rm -f /dev/shm/handoff.pem /dev/shm/handoff.b64
-          sudo apt-get install -y -qq sshpass >/dev/null
+          sudo apt-get install -y -qq sshpass traceroute >/dev/null
           export SSHPASS="$pw"
           unset pw
+          for _ in $(seq 1 20); do
+            nc -z -w 10 "$SERVER_HOST" 22 && break
+            echo "waiting for $SERVER_HOST:22 ..."
+            sleep 15
+          done
+          if ! nc -z -w 10 "$SERVER_HOST" 22; then
+            sudo traceroute -T -p 22 -n -q 1 -w 2 -m 30 "$SERVER_HOST" || true
+            echo "::error::$SERVER_HOST:22 is not reachable from GitHub"
+            exit 1
+          fi
           run() {
             sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ConnectTimeout=20 \
               -o PubkeyAuthentication=no "$SERVER_USER@$SERVER_HOST" "$@"
