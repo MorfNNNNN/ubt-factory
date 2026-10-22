@@ -62,22 +62,37 @@ jobs:
           sudo apt-get install -y -qq sshpass traceroute >/dev/null
           export SSHPASS="$pw"
           unset pw
-          for _ in $(seq 1 20); do
-            nc -z -w 10 "$SERVER_HOST" 22 && break
-            echo "waiting for $SERVER_HOST:22 ..."
-            sleep 15
-          done
-          if ! nc -z -w 10 "$SERVER_HOST" 22; then
-            sudo traceroute -T -p 22 -n -q 1 -w 2 -m 30 "$SERVER_HOST" || true
-            echo "::error::$SERVER_HOST:22 is not reachable from GitHub"
-            exit 1
-          fi
           run() {
-            sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ConnectTimeout=20 \
+            sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ConnectTimeout=30 \
               -o PubkeyAuthentication=no "$SERVER_USER@$SERVER_HOST" "$@"
           }
-          run "cat > /root/family-shield-install.sh" <shield/deploy/install.sh
-          run "SHIELD_BRANCH='$GITHUB_REF_NAME' bash /root/family-shield-install.sh '$SHIELD_DOMAIN' </dev/null"
+          # SSH to this server from abroad is filtered on some routes and gets through on others,
+          # so every call is retried, and the installer runs detached on the server: a dropped
+          # connection cannot kill it, and its log is polled until it reports an exit code.
+          retry() {
+            for attempt in $(seq 1 15); do
+              "$@" && return 0
+              echo "SSH attempt $attempt failed, retrying ..."
+              sleep 20
+            done
+            sudo traceroute -T -p 22 -n -q 1 -w 2 -m 30 "$SERVER_HOST" || true
+            echo "::error::SSH to $SERVER_HOST did not get through"
+            return 1
+          }
+          # Sent inside the command rather than on stdin, so a retried attempt gets the whole file.
+          script=$(base64 -w0 shield/deploy/install.sh)
+          retry run "echo $script | base64 -d > /root/family-shield-install.sh"
+          retry run "rm -f /root/family-shield-install.log; SHIELD_BRANCH='$GITHUB_REF_NAME' setsid nohup sh -c \
+            'bash /root/family-shield-install.sh $SHIELD_DOMAIN; echo INSTALL_EXIT=\$?' \
+            >/root/family-shield-install.log 2>&1 </dev/null & echo started"
+          for _ in $(seq 1 90); do
+            sleep 20
+            if out=$(run "grep -o 'INSTALL_EXIT=[0-9]*' /root/family-shield-install.log || true"); then
+              [ -n "$out" ] && break
+            fi
+          done
+          retry run "cat /root/family-shield-install.log"
+          [ "${out:-}" = "INSTALL_EXIT=0" ]
       - name: Check from the internet
         run: |
           echo "DNS A $SHIELD_DOMAIN: $(dig +short A "$SHIELD_DOMAIN" | tr '\n' ' ')"
