@@ -119,6 +119,16 @@ class ApiClient(
 
     suspend fun entitlement(): String = call("GET", ApiPaths.ENTITLEMENT, null, EntitlementResponse.serializer())!!.token
 
+    /** The server's entitlement public key (plain base64url text). */
+    suspend fun entitlementPublicKey(): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(baseUrl().trimEnd('/') + ApiPaths.ENTITLEMENT_PUBLIC_KEY)
+            .header("User-Agent", "FamilyShield/${BuildConfig.VERSION_NAME} Android").build()
+        http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw ApiException(response.code, "http_${response.code}", "Ошибка сервера (${response.code})")
+            response.body?.string().orEmpty().trim()
+        }
+    }
+
     suspend fun threatNumbers(since: Long): ThreatNumbersResponse =
         call("GET", "${ApiPaths.THREAT_NUMBERS}?since=$since", null, ThreatNumbersResponse.serializer())!!
 

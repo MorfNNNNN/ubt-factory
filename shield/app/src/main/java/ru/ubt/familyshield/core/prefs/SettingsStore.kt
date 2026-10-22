@@ -49,6 +49,8 @@ data class AppSettings(
     val pairedAt: Long = 0,
     val syncCursor: Long = 0,
     val entitlementToken: String? = null,
+    /** Server's entitlement key, pinned on first contact when the build has none baked in. */
+    val entitlementPublicKey: String? = null,
     val childPolicy: ChildPolicy = ChildPolicy(),
     val elderPolicy: ElderPolicy = ElderPolicy(),
     /** deviceId -> X.509 public key (base64url) of guardians this device trusts. */
@@ -106,6 +108,7 @@ class SettingsStore(private val context: Context, private val box: SecretBox, sc
         val pairedAt = longPreferencesKey("paired_at")
         val syncCursor = longPreferencesKey("sync_cursor")
         val entitlementToken = stringPreferencesKey("entitlement_token")
+        val entitlementPublicKey = stringPreferencesKey("entitlement_public_key")
         val childPolicy = stringPreferencesKey("child_policy")
         val elderPolicy = stringPreferencesKey("elder_policy")
         val trustedGuardians = stringPreferencesKey("trusted_guardians")
@@ -153,6 +156,7 @@ class SettingsStore(private val context: Context, private val box: SecretBox, sc
         pairedAt = p[K.pairedAt] ?: 0,
         syncCursor = p[K.syncCursor] ?: 0,
         entitlementToken = p[K.entitlementToken],
+        entitlementPublicKey = p[K.entitlementPublicKey],
         childPolicy = decode(ChildPolicy.serializer(), p[K.childPolicy], ChildPolicy()),
         elderPolicy = decode(ElderPolicy.serializer(), p[K.elderPolicy], ElderPolicy()),
         trustedGuardians = decode(stringMap, p[K.trustedGuardians], emptyMap()),
@@ -204,6 +208,7 @@ class SettingsStore(private val context: Context, private val box: SecretBox, sc
     }
     suspend fun setSyncCursor(cursor: Long) = update { it[K.syncCursor] = cursor }
     suspend fun setEntitlementToken(token: String?) = update { if (token == null) it.remove(K.entitlementToken) else it[K.entitlementToken] = token }
+    suspend fun setEntitlementPublicKey(key: String) = update { it[K.entitlementPublicKey] = key }
     suspend fun setChildPolicy(policy: ChildPolicy) = update { it[K.childPolicy] = ShieldJson.encodeToString(ChildPolicy.serializer(), policy) }
     suspend fun setElderPolicy(policy: ElderPolicy) = update { it[K.elderPolicy] = ShieldJson.encodeToString(ElderPolicy.serializer(), policy) }
     suspend fun setTrustedGuardians(map: Map<String, String>) = update { it[K.trustedGuardians] = ShieldJson.encodeToString(stringMap, map) }

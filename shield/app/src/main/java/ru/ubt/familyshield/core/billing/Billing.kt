@@ -24,6 +24,7 @@ import ru.rustore.sdk.pay.model.SubscriptionPurchase
 import ru.rustore.sdk.pay.model.SubscriptionPurchaseStatus
 import ru.ubt.familyshield.BuildConfig
 import ru.ubt.familyshield.core.net.ApiClient
+import ru.ubt.familyshield.core.prefs.AppSettings
 import ru.ubt.familyshield.core.prefs.SettingsStore
 import ru.ubt.familyshield.shared.billing.Entitlement
 import ru.ubt.familyshield.shared.billing.EntitlementToken
@@ -41,7 +42,9 @@ import kotlin.coroutines.suspendCoroutine
 
 /**
  * The family's current plan. Only server-signed tokens count (verified offline with the public key
- * compiled into the app), so a tampered client cannot grant itself premium features.
+ * compiled into the app), so a tampered client cannot grant itself premium features. Builds made
+ * before the server existed carry no key: they fetch it once over HTTPS (system CAs only, see
+ * network_security_config) and pin it.
  */
 class EntitlementRepository(
     private val settings: SettingsStore,
@@ -49,17 +52,19 @@ class EntitlementRepository(
     scope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    private val publicKey: PublicKey? = BuildConfig.ENTITLEMENT_PUBLIC_KEY.takeIf { it.isNotBlank() }
+    private val bakedKey: PublicKey? = parseKey(BuildConfig.ENTITLEMENT_PUBLIC_KEY)
+
+    private fun parseKey(b64: String?): PublicKey? = b64?.takeIf { it.isNotBlank() }
         ?.let { runCatching { Signatures.publicKeyFromX509(B64.decode(it)) }.getOrNull() }
 
-    private fun decode(token: String?, devPremium: Boolean): Entitlement {
-        if (devPremium) return Entitlement(tier = Tier.FAMILY_MAX, issuedAt = clock())
-        val key = publicKey ?: return Entitlement.FREE
-        return token?.let { EntitlementToken.verify(it, key) } ?: Entitlement.FREE
+    private fun decode(s: AppSettings): Entitlement {
+        if (s.devPremium) return Entitlement(tier = Tier.FAMILY_MAX, issuedAt = clock())
+        val key = bakedKey ?: parseKey(s.entitlementPublicKey) ?: return Entitlement.FREE
+        return s.entitlementToken?.let { EntitlementToken.verify(it, key) } ?: Entitlement.FREE
     }
 
-    val entitlement: StateFlow<Entitlement> = settings.state.map { decode(it.entitlementToken, it.devPremium) }
-        .stateIn(scope, SharingStarted.Eagerly, decode(settings.current.entitlementToken, settings.current.devPremium))
+    val entitlement: StateFlow<Entitlement> = settings.state.map { decode(it) }
+        .stateIn(scope, SharingStarted.Eagerly, decode(settings.current))
 
     val current: Entitlement get() = entitlement.value
 
@@ -71,6 +76,11 @@ class EntitlementRepository(
 
     suspend fun refresh() {
         if (settings.current.deviceToken == null) return
+        if (bakedKey == null && parseKey(settings.current.entitlementPublicKey) == null) {
+            runCatching { api.entitlementPublicKey() }.getOrNull()
+                ?.takeIf { parseKey(it) != null }
+                ?.let { settings.setEntitlementPublicKey(it) }
+        }
         runCatching { api.entitlement() }.onSuccess { settings.setEntitlementToken(it) }
     }
 
