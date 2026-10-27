@@ -95,6 +95,11 @@ android {
             // Robolectric downloads its runtime jars directly; route it through the Central mirror.
             it.systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2")
             it.systemProperty("robolectric.dependency.repo.id", "central-mirror")
+            // Store screenshots: ./gradlew :app:testDebugUnitTest --tests '*StoreScreenshots*' -Pshield.screenshots=true
+            it.systemProperty("shield.screenshots", project.findProperty("shield.screenshots") ?: "false")
+            // Each screen gets a fresh process: DataStore allows one instance per file per process.
+            if (project.findProperty("shield.screenshots") == "true") it.forkEvery = 1
+            it.systemProperty("shield.screenshotsDir", layout.buildDirectory.dir("store-screenshots").get().asFile.path)
         }
     }
 
@@ -145,6 +150,8 @@ dependencies {
 
     implementation(libs.okhttp)
     implementation(libs.zxing.embedded)
+    implementation(libs.lottie.compose)
+    implementation(libs.vico.compose.m3)
 
     implementation(platform(libs.rustore.bom))
     implementation(libs.rustore.pay)

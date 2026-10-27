@@ -1,5 +1,8 @@
 package ru.ubt.familyshield.ui.guardian
 
+import androidx.compose.material.icons.rounded.Warning
+import ru.ubt.familyshield.ui.components.gradient
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -113,7 +116,7 @@ private fun MemberCard(graph: AppGraph, state: FamilyUiState, member: MemberEnti
             }
             val recent = state.alerts.firstOrNull { it.deviceId == member.deviceId && !it.read && it.severity in setOf("CRITICAL", "HIGH") }
             if (recent != null) {
-                Avatar("⚠️", 32.dp, severityColor(ru.ubt.familyshield.shared.model.AlertSeverity.valueOf(recent.severity)).copy(alpha = 0.15f))
+                ru.ubt.familyshield.ui.components.IconTile(androidx.compose.material.icons.Icons.Rounded.Warning, ru.ubt.familyshield.shared.model.AlertSeverity.valueOf(recent.severity).gradient(), size = 32.dp)
             }
         }
     }

@@ -1,5 +1,7 @@
 package ru.ubt.familyshield.ui.guardian
 
+import ru.ubt.familyshield.ui.components.visual
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -67,7 +69,8 @@ private fun AlertCard(alert: AlertEntity, memberName: String, onClick: () -> Uni
     val severity = runCatching { AlertSeverity.valueOf(alert.severity) }.getOrDefault(AlertSeverity.INFO)
     SectionCard(onClick = onClick) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Avatar(alertEmoji(alert.type), 40.dp, severityColor(severity).copy(alpha = 0.15f))
+            (runCatching { ru.ubt.familyshield.shared.model.AlertType.valueOf(alert.type).visual() }.getOrNull() ?: ru.ubt.familyshield.ui.components.FeatureIcons.Protection)
+                .let { ru.ubt.familyshield.ui.components.IconTile(it.icon, it.gradient, size = 40.dp) }
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(alert.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))

@@ -55,6 +55,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.ubt.familyshield.shared.model.AlertSeverity
 import ru.ubt.familyshield.ui.theme.Brand
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.automirrored.rounded.Chat
+import androidx.compose.material.icons.rounded.*
+import ru.ubt.familyshield.ui.theme.Gradients
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.shadow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -71,7 +77,7 @@ fun ScreenScaffold(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад") }
                 },
@@ -95,7 +101,9 @@ fun SectionCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
-        modifier = modifier.fillMaxWidth().let { if (onClick != null) it.clickable(onClick = onClick) else it },
+        modifier = modifier.fillMaxWidth()
+            .shadow(8.dp, MaterialTheme.shapes.large, ambientColor = Brand.Green.copy(alpha = 0.12f), spotColor = Brand.Green.copy(alpha = 0.12f))
+            .let { if (onClick != null) it.clip(MaterialTheme.shapes.large).clickable(onClick = onClick) else it },
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = container),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -115,12 +123,9 @@ fun Pill(text: String, color: Color, textColor: Color = Color.White) {
     }
 }
 
+/** Family member portrait; [avatar] is an "avatar:<id>" value (older emoji values are mapped). */
 @Composable
-fun Avatar(emoji: String, size: Dp = 48.dp, background: Color = MaterialTheme.colorScheme.primaryContainer) {
-    Box(Modifier.size(size).clip(CircleShape).background(background), contentAlignment = Alignment.Center) {
-        Text(emoji, fontSize = (size.value * 0.5f).sp)
-    }
-}
+fun Avatar(avatar: String, size: Dp = 48.dp, role: String? = null) = AvatarImage(avatar, role, size)
 
 @Composable
 fun NavRow(title: String, subtitle: String? = null, icon: ImageVector? = null, emoji: String? = null, trailing: String? = null, onClick: () -> Unit) {
@@ -130,8 +135,8 @@ fun NavRow(title: String, subtitle: String? = null, icon: ImageVector? = null, e
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         when {
-            icon != null -> Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
-            emoji != null -> Text(emoji, fontSize = 24.sp)
+            icon != null -> IconTile(icon, Gradients.Emerald, size = 40.dp)
+            emoji != null -> emojiVisual(emoji).let { IconTile(it.icon, it.gradient, size = 40.dp) }
         }
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleSmall)
@@ -180,29 +185,38 @@ fun SliderRow(title: String, value: Int, range: IntRange, step: Int, label: (Int
 
 @Composable
 fun PrimaryButton(text: String, modifier: Modifier = Modifier, loading: Boolean = false, enabled: Boolean = true, color: Color? = null, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        enabled = enabled && !loading,
-        modifier = modifier.fillMaxWidth().height(56.dp),
-        shape = MaterialTheme.shapes.medium,
-        colors = if (color != null) ButtonDefaults.buttonColors(containerColor = color, contentColor = Color.White) else ButtonDefaults.buttonColors(),
+    val active = enabled && !loading
+    val fill = when {
+        !active -> Brush.linearGradient(listOf(Color(0xFFCBD5E1), Color(0xFF94A3B8)))
+        color != null -> Brush.linearGradient(listOf(color, color))
+        else -> Gradients.Emerald
+    }
+    Box(
+        modifier.fillMaxWidth().height(58.dp)
+            .shadow(if (active) 10.dp else 0.dp, MaterialTheme.shapes.medium, ambientColor = (color ?: Brand.Green).copy(alpha = 0.4f), spotColor = (color ?: Brand.Green).copy(alpha = 0.4f))
+            .clip(MaterialTheme.shapes.medium).background(fill)
+            .clickable(enabled = active, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        if (loading) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-        else Text(text, style = MaterialTheme.typography.labelLarge, fontSize = 17.sp)
+        if (loading) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = Color.White)
+        else Text(text, style = MaterialTheme.typography.labelLarge, fontSize = 17.sp, color = Color.White)
     }
 }
 
 @Composable
 fun SecondaryButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, modifier = modifier.fillMaxWidth().height(52.dp), shape = MaterialTheme.shapes.medium) {
-        Text(text, style = MaterialTheme.typography.labelLarge)
+    OutlinedButton(
+        onClick = onClick, modifier = modifier.fillMaxWidth().height(54.dp), shape = MaterialTheme.shapes.medium,
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
     }
 }
 
 @Composable
 fun EmptyState(emoji: String, title: String, text: String, action: (@Composable () -> Unit)? = null) {
     Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(emoji, fontSize = 56.sp)
+        emojiVisual(emoji).let { IconTile(it.icon, it.gradient, size = 84.dp) }
         Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         action?.invoke()
@@ -226,8 +240,8 @@ fun Banner(text: String, color: Color, textColor: Color = Color.White, emoji: St
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth().let { if (onClick != null) it.clickable(onClick = onClick) else it },
     ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(emoji, fontSize = 20.sp)
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            emojiVisual(emoji).let { Icon(it.icon, null, tint = textColor, modifier = Modifier.size(22.dp)) }
             Text(text, color = textColor, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
         }
     }
@@ -276,5 +290,47 @@ fun ColumnScreen(padding: PaddingValues, content: @Composable ColumnScope.() -> 
     ) {
         content()
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * Maps the emoji earlier screens passed for decoration to a glyph tile, so no emoji is ever drawn.
+ * New code passes icons directly.
+ */
+internal fun emojiVisual(e: String): Visual {
+    val icons = androidx.compose.material.icons.Icons.Rounded
+    return when {
+        e.startsWith("⚠") || e.startsWith("🚨") || e.startsWith("❗") -> Visual(icons.Warning, Gradients.Sunrise)
+        e.startsWith("✅") || e.startsWith("✓") || e.startsWith("👍") || e.startsWith("💚") -> Visual(icons.CheckCircle, Gradients.Emerald)
+        e.startsWith("🛡") -> Visual(icons.Shield, Gradients.Emerald)
+        e.startsWith("📍") || e.startsWith("🗺") -> Visual(icons.LocationOn, Gradients.Ocean)
+        e.startsWith("🔒") || e.startsWith("🔐") -> Visual(icons.Lock, Gradients.Slate)
+        e.startsWith("🆘") -> Visual(icons.Sos, Gradients.Danger)
+        e.startsWith("📞") || e.startsWith("☎") -> Visual(icons.Call, Gradients.Emerald)
+        e.startsWith("🔋") || e.startsWith("🔌") -> Visual(icons.Battery5Bar, Gradients.Sunrise)
+        e.startsWith("📚") -> Visual(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.MenuBook, Gradients.Sky)
+        e.startsWith("⏳") || e.startsWith("⏰") || e.startsWith("🕐") -> Visual(icons.HourglassBottom, Gradients.Sky)
+        e.startsWith("🔔") -> Visual(icons.Notifications, Gradients.Emerald)
+        e.startsWith("⚙") || e.startsWith("🔧") -> Visual(icons.Settings, Gradients.Slate)
+        e.startsWith("📱") -> Visual(icons.Smartphone, Gradients.Sky)
+        e.startsWith("🌙") -> Visual(icons.Bedtime, Gradients.Night)
+        e.startsWith("🔍") -> Visual(icons.ManageSearch, Gradients.Violet)
+        e.startsWith("⛔") || e.startsWith("🛑") -> Visual(icons.Block, Gradients.Danger)
+        e.startsWith("🌐") -> Visual(icons.Language, Gradients.Violet)
+        e.startsWith("💊") -> Visual(icons.Medication, Gradients.Sunrise)
+        e.startsWith("❓") -> Visual(icons.HelpOutline, Gradients.Slate)
+        e.startsWith("📄") || e.startsWith("✉") -> Visual(icons.Description, Gradients.Slate)
+        e.startsWith("💬") -> Visual(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.Chat, Gradients.Sky)
+        e.startsWith("📷") -> Visual(icons.PhotoCamera, Gradients.Night)
+        e.startsWith("🖼") -> Visual(icons.Photo, Gradients.Ocean)
+        e.startsWith("🔗") -> Visual(icons.Link, Gradients.Violet)
+        e.startsWith("🎉") -> Visual(icons.Celebration, Gradients.Gold)
+        e.startsWith("⏸") -> Visual(icons.Pause, Gradients.Sky)
+        e.startsWith("📦") -> Visual(icons.Apps, Gradients.Violet)
+        e.startsWith("💼") -> Visual(icons.Work, Gradients.Slate)
+        e.startsWith("👵") || e.startsWith("🧓") -> Visual(icons.Elderly, Gradients.Violet)
+        e.startsWith("👧") || e.startsWith("🧒") -> Visual(icons.ChildCare, Gradients.Sky)
+        e.startsWith("🕊") -> Visual(icons.VolunteerActivism, Gradients.Emerald)
+        else -> Visual(icons.Person, Gradients.Slate)
     }
 }

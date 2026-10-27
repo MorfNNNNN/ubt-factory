@@ -4,14 +4,21 @@ import android.app.Application
 import kotlinx.coroutines.launch
 import ru.ubt.familyshield.core.push.ShieldPushService
 
-class ShieldApp : Application() {
+open class ShieldApp : Application() {
     lateinit var graph: AppGraph
         private set
 
     override fun onCreate() {
         super.onCreate()
-        graph = AppGraph(this)
+        graph = createGraph()
         graph.notifier.createChannels()
+        startBackground()
+    }
+
+    /** Store-screenshot tests replace these to run without Android Keystore, push and WorkManager. */
+    protected open fun createGraph(): AppGraph = AppGraph(this)
+
+    protected open fun startBackground() {
         ShieldPushService.init(this)
         graph.scheduleWork()
         graph.appScope.launch {
