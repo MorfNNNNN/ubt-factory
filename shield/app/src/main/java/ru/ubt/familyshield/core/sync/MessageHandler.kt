@@ -28,6 +28,9 @@ import ru.ubt.familyshield.shared.model.RequestDecision
 import ru.ubt.familyshield.shared.model.RequestKind
 import ru.ubt.familyshield.shared.protocol.Audience
 import ru.ubt.familyshield.shared.protocol.FamilyPayload
+import ru.ubt.familyshield.shared.model.TaskState
+import ru.ubt.familyshield.core.family.toEntity
+import ru.ubt.familyshield.core.family.task
 import ru.ubt.familyshield.shared.protocol.InnerMessage
 
 /** What a protected device does when its guardians change something. Implemented by the protection layer. */
@@ -107,6 +110,25 @@ class MessageHandler(
             is FamilyPayload.GuardianKey -> onGuardianKey(senderDeviceId, payload, auth)
             is FamilyPayload.KeyRotation -> family.acceptRotation(payload)
             is FamilyPayload.EntitlementShare -> settings.setEntitlementToken(payload.token)
+            is FamilyPayload.TaskUpdate -> {
+                val task = payload.task
+                if (isGuardian || task.assigneeDeviceId == me) db.tasks().upsert(task.toEntity())
+            }
+            is FamilyPayload.TaskDone -> onTaskDone(senderDeviceId, payload)
+            is FamilyPayload.TaskReview -> db.tasks().get(payload.taskId)?.task()?.let { task ->
+                db.tasks().upsert(task.copy(state = if (payload.approved) TaskState.APPROVED else TaskState.DECLINED,
+                    reviewedAt = payload.reviewedAt, updatedAt = payload.reviewedAt).toEntity())
+                if (task.assigneeDeviceId == me) {
+                    notifier.info(
+                        ("task-review-" + task.id).hashCode(),
+                        if (payload.approved) "Задание принято" else "Задание вернули",
+                        if (payload.approved && task.rewardMinutes > 0) "«${task.title}» — +${task.rewardMinutes} мин" else "«${task.title}»",
+                    )
+                }
+            }
+            is FamilyPayload.Learning -> updateMember(senderDeviceId) {
+                it.copy(learningJson = ShieldJson.encodeToString(ru.ubt.familyshield.shared.model.SafetyProgress.serializer(), payload.progress))
+            }
             is FamilyPayload.ChildPolicyUpdate -> if (payload.targetDeviceId == me) {
                 if (payload.policy.version >= settings.current.childPolicy.version) {
                     settings.setChildPolicy(payload.policy)
@@ -193,6 +215,19 @@ class MessageHandler(
         )
         if (inserted != -1L && notify && isGuardian && alert.severity >= AlertSeverity.WARNING) {
             notifier.memberAlert(alert.id, memberName(sender), alert.title, alert.body, alert.severity)
+        }
+    }
+
+    /** Only the assignee can finish its task; guardians get an event to confirm it. */
+    private suspend fun onTaskDone(sender: String, payload: FamilyPayload.TaskDone) {
+        val task = db.tasks().get(payload.taskId)?.task() ?: return
+        if (task.assigneeDeviceId != sender) return
+        db.tasks().upsert(task.copy(state = TaskState.DONE, doneAt = payload.doneAt, reviewedAt = null, updatedAt = payload.doneAt).toEntity())
+        if (isGuardian) {
+            val title = "${memberName(sender)}: задание выполнено"
+            val body = "«${task.title}». Подтвердите, чтобы начислить ${task.rewardMinutes} мин."
+            onAlert(sender, Alert(id = "task-${task.id}-${payload.doneAt}", type = AlertType.TASK_DONE, title = title, body = body, createdAt = payload.doneAt))
+            notifier.info(("task-done-" + task.id).hashCode(), title, body)
         }
     }
 

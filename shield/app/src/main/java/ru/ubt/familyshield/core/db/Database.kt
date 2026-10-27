@@ -1,6 +1,7 @@
 package ru.ubt.familyshield.core.db
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -46,6 +47,8 @@ data class MemberEntity(
     val todayMinutes: Int? = null,
     /** Phone shared in the member's profile (used for SOS and "call family"). */
     val phone: String? = null,
+    /** JSON SafetyProgress the member shared («Школа безопасности», checklist). */
+    val learningJson: String? = null,
 )
 
 @Entity(tableName = "alerts", indices = [Index("deviceId"), Index("createdAt")])
@@ -312,13 +315,43 @@ interface ThreatNumberDao {
     suspend fun count(): Int
 }
 
+/** A child's task; [json] holds the full FamilyTask, the other columns serve queries. */
+@Entity(tableName = "tasks", indices = [Index("assigneeDeviceId")])
+data class TaskEntity(
+    @PrimaryKey val id: String,
+    val assigneeDeviceId: String,
+    val state: String,
+    val updatedAt: Long,
+    val deleted: Boolean,
+    val json: String,
+)
+
+@Dao
+interface TaskDao {
+    @Query("SELECT * FROM tasks WHERE deleted = 0 ORDER BY updatedAt DESC")
+    fun observeAll(): Flow<List<TaskEntity>>
+
+    @Query("SELECT * FROM tasks WHERE deleted = 0 AND assigneeDeviceId = :deviceId ORDER BY updatedAt DESC")
+    fun observeFor(deviceId: String): Flow<List<TaskEntity>>
+
+    @Query("SELECT * FROM tasks WHERE id = :id")
+    suspend fun get(id: String): TaskEntity?
+
+    @Upsert
+    suspend fun upsert(task: TaskEntity)
+
+    @Query("DELETE FROM tasks")
+    suspend fun clear()
+}
+
 @Database(
     entities = [
         MemberEntity::class, AlertEntity::class, LocationEntity::class, UsageEntity::class, RequestEntity::class,
-        NoteEntity::class, OutboxEntity::class, EventEntity::class, ThreatNumberEntity::class,
+        NoteEntity::class, OutboxEntity::class, EventEntity::class, ThreatNumberEntity::class, TaskEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
 abstract class ShieldDatabase : RoomDatabase() {
     abstract fun members(): MemberDao
@@ -330,6 +363,7 @@ abstract class ShieldDatabase : RoomDatabase() {
     abstract fun outbox(): OutboxDao
     abstract fun events(): EventDao
     abstract fun threatNumbers(): ThreatNumberDao
+    abstract fun tasks(): TaskDao
 
     suspend fun clearFamilyData() {
         members().clear()
@@ -339,6 +373,7 @@ abstract class ShieldDatabase : RoomDatabase() {
         requests().clear()
         notes().clear()
         outbox().clear()
+        tasks().clear()
     }
 
     companion object {

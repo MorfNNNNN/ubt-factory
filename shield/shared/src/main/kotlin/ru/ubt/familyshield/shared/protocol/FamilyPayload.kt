@@ -10,10 +10,12 @@ import ru.ubt.familyshield.shared.model.Command
 import ru.ubt.familyshield.shared.model.DeviceStatus
 import ru.ubt.familyshield.shared.model.ElderPolicy
 import ru.ubt.familyshield.shared.model.FamilyNote
+import ru.ubt.familyshield.shared.model.FamilyTask
 import ru.ubt.familyshield.shared.model.LocationFix
 import ru.ubt.familyshield.shared.model.MemberProfile
 import ru.ubt.familyshield.shared.model.MemberRequest
 import ru.ubt.familyshield.shared.model.RequestDecision
+import ru.ubt.familyshield.shared.model.SafetyProgress
 import ru.ubt.familyshield.shared.model.SecurityReport
 import ru.ubt.familyshield.shared.model.UsageReport
 
@@ -115,6 +117,30 @@ sealed class FamilyPayload {
     data class KeyRotation(val epoch: Int, val wrappedKeys: Map<String, String>) : FamilyPayload() {
         override val requiresGuardianSignature: Boolean get() = true
     }
+
+    /** A guardian creates, edits or removes a child's task. */
+    @Serializable
+    @SerialName("task")
+    data class TaskUpdate(val task: FamilyTask) : FamilyPayload() {
+        override val requiresGuardianSignature: Boolean get() = true
+    }
+
+    /** The child marks a task as done; a guardian confirms it with [TaskReview]. */
+    @Serializable
+    @SerialName("task_done")
+    data class TaskDone(val taskId: String, val doneAt: Long) : FamilyPayload()
+
+    /** A guardian accepts or returns a done task; accepted tasks come with bonus minutes in a policy update. */
+    @Serializable
+    @SerialName("task_review")
+    data class TaskReview(val taskId: String, val approved: Boolean, val reviewedAt: Long) : FamilyPayload() {
+        override val requiresGuardianSignature: Boolean get() = true
+    }
+
+    /** A member's progress in «Школа безопасности» and the official-protection checklist. */
+    @Serializable
+    @SerialName("learning")
+    data class Learning(val progress: SafetyProgress) : FamilyPayload()
 
     /** Signed entitlement token issued by the server, re-shared so offline devices can verify the plan. */
     @Serializable

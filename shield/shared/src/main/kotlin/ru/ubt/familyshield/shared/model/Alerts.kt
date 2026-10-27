@@ -38,6 +38,8 @@ enum class AlertType(val defaultSeverity: AlertSeverity) {
     FILTER_BYPASS(AlertSeverity.HIGH),
     MEDICATION_MISSED(AlertSeverity.WARNING),
     MEDICATION_TAKEN(AlertSeverity.INFO),
+
+    TASK_DONE(AlertSeverity.INFO),
 }
 
 /**

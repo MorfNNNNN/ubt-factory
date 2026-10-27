@@ -11,11 +11,12 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -27,6 +28,7 @@ import ru.ubt.familyshield.shared.model.AgeBand
 import ru.ubt.familyshield.shared.model.ChildPolicy
 import ru.ubt.familyshield.shared.model.ElderPolicy
 import ru.ubt.familyshield.shared.model.MemberRole
+import ru.ubt.familyshield.shared.model.SafetyProgress
 import ru.ubt.familyshield.shared.policy.ProtectionChangeRequest
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "shield_settings")
@@ -80,6 +82,8 @@ data class AppSettings(
      * (or a guardian's confirmation), so a scammer on the phone cannot talk them into it.
      */
     val elderSelfProtect: Boolean = false,
+    /** This member's «Школа безопасности» progress and protection checklist. */
+    val learning: SafetyProgress = SafetyProgress(),
 ) {
     val isPaired: Boolean get() = familyId != null && deviceId != null
     val isGuardian: Boolean get() = role == MemberRole.GUARDIAN
@@ -131,6 +135,7 @@ class SettingsStore(private val context: Context, private val box: SecretBox, sc
         val phone = stringPreferencesKey("phone")
         val simpleHome = booleanPreferencesKey("simple_home")
         val elderSelfProtect = booleanPreferencesKey("elder_self_protect")
+        val learning = stringPreferencesKey("learning_progress")
     }
 
     private val store = context.dataStore
@@ -179,15 +184,25 @@ class SettingsStore(private val context: Context, private val box: SecretBox, sc
         phone = p[K.phone].orEmpty(),
         simpleHome = p[K.simpleHome] ?: false,
         elderSelfProtect = p[K.elderSelfProtect] ?: false,
+        learning = decode(SafetyProgress.serializer(), p[K.learning], SafetyProgress()),
     )
 
-    val state: StateFlow<AppSettings> = store.data.map { read(it) }
-        .stateIn(scope, SharingStarted.Eagerly, runBlocking { read(store.data.first()) })
+    private val mutableState = MutableStateFlow(runBlocking { read(store.data.first()) })
 
-    val current: AppSettings get() = state.value
+    /**
+     * Settings as last written. Writes publish their result immediately, so a read right after a
+     * write (read-modify-write in [update] callers) never sees the previous value.
+     */
+    val state: StateFlow<AppSettings> = mutableState.asStateFlow()
+
+    val current: AppSettings get() = mutableState.value
+
+    init {
+        scope.launch { store.data.collect { mutableState.value = read(it) } }
+    }
 
     private suspend fun update(block: (MutablePreferences) -> Unit) {
-        store.edit { block(it) }
+        mutableState.value = read(store.edit { block(it) })
     }
 
     suspend fun setRole(role: MemberRole) = update { it[K.role] = role.name }
@@ -239,6 +254,7 @@ class SettingsStore(private val context: Context, private val box: SecretBox, sc
     suspend fun setPhone(phone: String) = update { it[K.phone] = phone.trim() }
     suspend fun setSimpleHome(on: Boolean) = update { it[K.simpleHome] = on }
     suspend fun setElderSelfProtect(on: Boolean) = update { it[K.elderSelfProtect] = on }
+    suspend fun setLearning(progress: SafetyProgress) = update { it[K.learning] = ShieldJson.encodeToString(SafetyProgress.serializer(), progress) }
 
     // --- Key material (sealed) ---
 

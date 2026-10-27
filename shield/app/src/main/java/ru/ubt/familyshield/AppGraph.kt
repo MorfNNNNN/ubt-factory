@@ -47,6 +47,7 @@ class AppGraph(val app: Application, box: SecretBox = KeystoreSecretBox()) {
     }
     val family: FamilyRepository by lazy { FamilyRepository(settings, api, db, secretBox, { signer }, { sync }) }
     val guardian: ru.ubt.familyshield.core.family.GuardianActions by lazy { ru.ubt.familyshield.core.family.GuardianActions(settings, db, { sync }) }
+    val actions: ru.ubt.familyshield.core.family.FamilyActions by lazy { ru.ubt.familyshield.core.family.FamilyActions(settings, db, { sync }) }
     val handler: MessageHandler by lazy { MessageHandler(settings, db, family, notifier, secretBox, { sync }, { protection.controller }) }
     val entitlements: EntitlementRepository by lazy { EntitlementRepository(settings, api, appScope) }
     val billing: BillingManager by lazy { BillingManager(settings, api, entitlements) }

@@ -20,6 +20,9 @@ import ru.ubt.familyshield.shared.model.RequestDecision
 import ru.ubt.familyshield.shared.model.RequestKind
 import ru.ubt.familyshield.shared.protocol.Audience
 import ru.ubt.familyshield.shared.protocol.FamilyPayload
+import ru.ubt.familyshield.shared.model.FamilyTask
+import ru.ubt.familyshield.shared.model.TaskRepeat
+import ru.ubt.familyshield.shared.model.TaskState
 import java.time.LocalDate
 import java.util.UUID
 
@@ -97,6 +100,39 @@ class GuardianActions(
         db.notes().insert(NoteEntity(note.id, settings.current.deviceId.orEmpty(), note.text, quickReply?.name, note.createdAt, mine = true))
         sender().send(FamilyPayload.Note(note), Audience.ALL, urgent = true)
     }
+
+    suspend fun createTask(memberId: String, title: String, kind: String, rewardMinutes: Int, points: Int, repeat: TaskRepeat): FamilyTask {
+        val now = clock()
+        val task = FamilyTask(
+            id = UUID.randomUUID().toString(), assigneeDeviceId = memberId, title = title.trim().take(80), kind = kind,
+            rewardMinutes = rewardMinutes.coerceIn(0, 240), points = points.coerceIn(0, 100), repeat = repeat,
+            createdBy = settings.current.deviceId.orEmpty(), createdAt = now,
+        )
+        saveTask(task)
+        sender().send(FamilyPayload.TaskUpdate(task), Audience.DEVICES, recipients(memberId), urgent = true)
+        return task
+    }
+
+    suspend fun deleteTask(taskId: String) {
+        val task = loadTask(taskId) ?: return
+        val removed = task.copy(deleted = true, updatedAt = clock())
+        saveTask(removed)
+        sender().send(FamilyPayload.TaskUpdate(removed), Audience.DEVICES, recipients(task.assigneeDeviceId), urgent = true)
+    }
+
+    /** Accepting a done task grants its reward as bonus screen time for today. */
+    suspend fun reviewTask(taskId: String, approved: Boolean) {
+        val task = loadTask(taskId) ?: return
+        val now = clock()
+        saveTask(task.copy(state = if (approved) TaskState.APPROVED else TaskState.DECLINED, reviewedAt = now, updatedAt = now))
+        sender().send(FamilyPayload.TaskReview(taskId, approved, now), Audience.DEVICES, recipients(task.assigneeDeviceId), urgent = true)
+        if (approved && task.rewardMinutes > 0) bonus(task.assigneeDeviceId, task.rewardMinutes, "Задание: ${task.title}")
+    }
+
+    private suspend fun loadTask(id: String): FamilyTask? =
+        db.tasks().get(id)?.let { ShieldJson.decodeFromString(FamilyTask.serializer(), it.json) }
+
+    private suspend fun saveTask(task: FamilyTask) = db.tasks().upsert(task.toEntity())
 
     suspend fun renameMember(memberId: String, name: String, avatar: String) {
         db.members().get(memberId)?.let { db.members().upsert(it.copy(displayName = name.trim().ifBlank { it.displayName }, avatar = avatar)) }
