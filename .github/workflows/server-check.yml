@@ -35,6 +35,17 @@ jobs:
           done
           curl -sS -m 10 -o /dev/null -w "http://$SERVER_HOST/health: %{http_code}\n" "http://$SERVER_HOST/health" || true
           curl -sS -m 10 -o /dev/null -w "http://$SHIELD_DOMAIN/: %{http_code} -> %{redirect_url}\n" "http://$SHIELD_DOMAIN/" || true
+      - name: Other management ports
+        run: |
+          # Web panels with a built-in terminal (ISPmanager 1500, Cockpit 9090, Webmin 10000) and spare SSH ports.
+          for port in 1500 1501 2222 2022 22222 8022 8080 8443 9090 10000; do
+            if out=$(timeout 8 bash -c "exec 3<>/dev/tcp/$SERVER_HOST/$port && timeout 4 head -c 48 <&3" 2>/dev/null); then
+              echo "port $port: open ${out:+(says: $(printf '%s' "$out" | tr -dc '[:print:]'))}"
+            else
+              timeout 8 bash -c "exec 3<>/dev/tcp/$SERVER_HOST/$port" 2>/dev/null && echo "port $port: open" || echo "port $port: closed"
+            fi
+          done
+          curl -sk -m 10 -o /dev/null -w "https://$SERVER_HOST:1500/ispmgr: %{http_code}\n" "https://$SERVER_HOST:1500/ispmgr" || true
       - name: HTTPS certificate and pages
         run: |
           echo | timeout 20 openssl s_client -connect "$SERVER_HOST:443" -servername "$SHIELD_DOMAIN" 2>&1 \
