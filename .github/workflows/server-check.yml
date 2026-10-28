@@ -44,4 +44,6 @@ jobs:
           done
           curl -sS -m 10 "https://$SHIELD_DOMAIN/health" || true
       - name: Route to port 22
-        run: sudo traceroute -T -p 22 -n -q 1 -w 2 -m 25 "$SERVER_HOST" || true
+        run: |
+          sudo apt-get install -y -qq traceroute >/dev/null 2>&1 || true
+          sudo traceroute -T -p 22 -n -q 1 -w 2 -m 25 "$SERVER_HOST" || true
