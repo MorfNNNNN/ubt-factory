@@ -134,7 +134,7 @@ class ShieldService : LifecycleService() {
                     dedupeKey = "install-$pkg", cooldownMs = 24 * 3_600_000L, sourceApp = pkg, sourceAppLabel = app.label,
                     severity = if (dangerous || p.calls.inCall) AlertSeverity.CRITICAL else AlertSeverity.HIGH,
                 )
-                p.notifier.warning("⚠ Опасное приложение", "«${app.label}» установлено не из магазина. Если вас попросили его установить по телефону — это мошенники. Удалите его.")
+                p.notifier.warning("Опасное приложение", "«${app.label}» установлено не из магазина. Если вас попросили его установить по телефону — это мошенники. Удалите его.")
             } else if (p.settings.current.elderPolicy.newAppAlert || role == MemberRole.CHILD) {
                 p.alerts.raise(AlertType.NEW_APP_INSTALLED, "Новое приложение: ${app.label}", app.category.name, dedupeKey = "new-$pkg",
                     cooldownMs = 24 * 3_600_000L, sourceApp = pkg, sourceAppLabel = app.label)

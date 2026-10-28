@@ -82,7 +82,7 @@ enum class QuickReply(val textRu: String) {
     CALL_ME("Перезвони мне, пожалуйста"),
     COME_HOME("Приезжай, нужна помощь"),
     ON_MY_WAY("Уже еду"),
-    LOVE("Люблю тебя ❤️"),
+    LOVE("Люблю тебя"),
     BUSY("Сейчас занят, позвоню позже"),
 }
 

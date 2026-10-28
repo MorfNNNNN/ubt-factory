@@ -21,7 +21,7 @@ data class MemberEntity(
     @PrimaryKey val deviceId: String,
     val role: String,
     val displayName: String = "",
-    val avatar: String = "🙂",
+    val avatar: String = "",
     val birthYear: Int? = null,
     val deviceModel: String = "",
     val androidVersion: Int = 0,
@@ -333,6 +333,10 @@ interface TaskDao {
 
     @Query("SELECT * FROM tasks WHERE deleted = 0 AND assigneeDeviceId = :deviceId ORDER BY updatedAt DESC")
     fun observeFor(deviceId: String): Flow<List<TaskEntity>>
+
+    /** Includes removed tasks: their earned points still count. */
+    @Query("SELECT * FROM tasks WHERE assigneeDeviceId = :deviceId")
+    fun observeHistoryFor(deviceId: String): Flow<List<TaskEntity>>
 
     @Query("SELECT * FROM tasks WHERE id = :id")
     suspend fun get(id: String): TaskEntity?

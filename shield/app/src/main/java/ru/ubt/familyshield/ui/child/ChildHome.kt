@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Chat
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AllInclusive
 import androidx.compose.material.icons.rounded.Celebration
 import androidx.compose.material.icons.rounded.GppMaybe
@@ -63,6 +64,8 @@ import ru.ubt.familyshield.shared.policy.formatMinuteOfDay
 import ru.ubt.familyshield.shared.policy.formatMinutes
 import ru.ubt.familyshield.ui.FamilyUiState
 import ru.ubt.familyshield.ui.ShieldViewModel
+import ru.ubt.familyshield.ui.components.Art3D
+import ru.ubt.familyshield.ui.components.ArtTile
 import ru.ubt.familyshield.ui.components.AvatarImage
 import ru.ubt.familyshield.ui.components.GlyphLine
 import ru.ubt.familyshield.ui.components.HeroCard
@@ -72,9 +75,14 @@ import ru.ubt.familyshield.ui.components.NoticeCard
 import ru.ubt.familyshield.ui.components.ProgressRing
 import ru.ubt.familyshield.ui.components.SoftCard
 import ru.ubt.familyshield.ui.components.SosPulse
+import ru.ubt.familyshield.ui.safety.SafetySchoolScreen
 import ru.ubt.familyshield.ui.setup.PermissionWizard
+import ru.ubt.familyshield.ui.tasks.ChildTasksCard
+import ru.ubt.familyshield.ui.tasks.ChildTasksScreen
 import ru.ubt.familyshield.ui.theme.Brand
 import ru.ubt.familyshield.ui.theme.Gradients
+
+private enum class ChildPage { HOME, TASKS, SCHOOL }
 
 /** The child's own screen: honest, friendly, shows their time left and lets them reach parents and SOS. */
 @Composable
@@ -82,7 +90,13 @@ fun ChildHome(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var showPermissions by remember { mutableStateOf(false) }
+    var page by remember { mutableStateOf(ChildPage.HOME) }
     if (showPermissions) { PermissionWizard(graph, onboarding = false, onBack = { showPermissions = false }) { showPermissions = false }; return }
+    when (page) {
+        ChildPage.TASKS -> { ChildTasksScreen(graph) { page = ChildPage.HOME }; return }
+        ChildPage.SCHOOL -> { SafetySchoolScreen(graph) { page = ChildPage.HOME }; return }
+        ChildPage.HOME -> Unit
+    }
 
     val policy = state.settings.childPolicy
     val snapshot = remember(state.self?.todayMinutes) { UsageSnapshot(state.self?.todayMinutes ?: 0, emptyMap(), emptyMap()) }
@@ -141,7 +155,20 @@ fun ChildHome(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState) {
             }
         }
 
+        ChildTasksCard(graph) { page = ChildPage.TASKS }
+
         SosCard { context.startActivity(Intent(context, SosActivity::class.java)) }
+
+        SoftCard(onClick = { page = ChildPage.SCHOOL }, padding = 16.dp) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                ArtTile(Art3D.Link, size = 58.dp)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Как не попасться на обман", style = MaterialTheme.typography.titleMedium)
+                    Text("Короткие уроки: ссылки, фейки, покупки онлайн", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
 
         SoftCard {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

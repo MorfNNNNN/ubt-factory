@@ -18,12 +18,14 @@ import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.automirrored.rounded.ManageSearch
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.PrivacyTip
+import androidx.compose.material.icons.rounded.School
 import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -66,8 +68,10 @@ import ru.ubt.familyshield.ui.paywall.UpsellReason
 import ru.ubt.familyshield.ui.theme.Brand
 import ru.ubt.familyshield.ui.theme.Gradients
 import ru.ubt.familyshield.ui.tools.CheckerScreen
+import ru.ubt.familyshield.ui.safety.GosProtectionsScreen
+import ru.ubt.familyshield.ui.safety.SafetySchoolScreen
 
-private enum class SettingsScreen { MAIN, CHECKER, PRIVACY, TERMS, HELP }
+private enum class SettingsScreen { MAIN, CHECKER, SCHOOL, GOS, PRIVACY, TERMS, HELP }
 
 @Composable
 fun GuardianSettings(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState) {
@@ -75,6 +79,8 @@ fun GuardianSettings(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState)
     var paywall by remember { mutableStateOf(false) }
     when (screen) {
         SettingsScreen.CHECKER -> { CheckerScreen(graph) { screen = SettingsScreen.MAIN }; return }
+        SettingsScreen.SCHOOL -> { SafetySchoolScreen(graph) { screen = SettingsScreen.MAIN }; return }
+        SettingsScreen.GOS -> { GosProtectionsScreen(graph) { screen = SettingsScreen.MAIN }; return }
         SettingsScreen.PRIVACY -> { LegalScreen.Privacy { screen = SettingsScreen.MAIN }; return }
         SettingsScreen.TERMS -> { LegalScreen.Terms { screen = SettingsScreen.MAIN }; return }
         SettingsScreen.HELP -> { LegalScreen.Help { screen = SettingsScreen.MAIN }; return }
@@ -146,6 +152,14 @@ fun GuardianSettings(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState)
                 "Проверить номер, ссылку, сообщение", subtitle = "Подскажем, не мошенники ли это",
                 icon = Icons.AutoMirrored.Rounded.ManageSearch, gradient = Gradients.Violet,
             ) { screen = SettingsScreen.CHECKER }
+            TileRow(
+                "Школа безопасности", subtitle = "12 уроков о схемах мошенников с проверкой",
+                icon = Icons.Rounded.School, gradient = Gradients.Violet,
+            ) { screen = SettingsScreen.SCHOOL }
+            TileRow(
+                "Госуслуги и банк", subtitle = "Самозапрет на кредиты, SIM-карты и другие меры",
+                icon = Icons.Rounded.AccountBalance, gradient = Gradients.Emerald,
+            ) { screen = SettingsScreen.GOS }
         }
 
         GroupCard(title = "О приложении и помощь") {

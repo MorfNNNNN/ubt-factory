@@ -20,9 +20,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccessibilityNew
+import androidx.compose.material.icons.rounded.AdminPanelSettings
+import androidx.compose.material.icons.rounded.BatteryChargingFull
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Contacts
+import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.MarkChatRead
+import androidx.compose.material.icons.rounded.MyLocation
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.PhoneDisabled
+import androidx.compose.material.icons.rounded.PhoneInTalk
+import androidx.compose.material.icons.rounded.QueryStats
+import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -36,20 +51,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import ru.ubt.familyshield.AppGraph
 import ru.ubt.familyshield.protect.service.ShieldDeviceAdmin
 import ru.ubt.familyshield.protect.service.ShieldVpnService
 import ru.ubt.familyshield.shared.model.ProtectionComponent
-import ru.ubt.familyshield.ui.components.Banner
+import ru.ubt.familyshield.R
+import ru.ubt.familyshield.ui.components.Art3D
+import ru.ubt.familyshield.ui.components.BackButton
+import ru.ubt.familyshield.ui.components.GlyphLine
+import ru.ubt.familyshield.ui.components.HeroCard
+import ru.ubt.familyshield.ui.components.IconTile
+import ru.ubt.familyshield.ui.components.Illustration
+import ru.ubt.familyshield.ui.components.LabelChip
+import ru.ubt.familyshield.ui.components.LottieWithFallback
 import ru.ubt.familyshield.ui.components.PrimaryButton
-import ru.ubt.familyshield.ui.components.ProgressBar
+import ru.ubt.familyshield.ui.components.ProgressRing
 import ru.ubt.familyshield.ui.components.SecondaryButton
-import ru.ubt.familyshield.ui.components.SectionCard
+import ru.ubt.familyshield.ui.components.SoftCard
+import ru.ubt.familyshield.ui.components.Visual
 import ru.ubt.familyshield.ui.theme.Brand
+import ru.ubt.familyshield.ui.theme.Gradients
 
 private data class PermCopy(val title: String, val why: String)
 
@@ -120,42 +145,58 @@ fun PermissionWizard(graph: AppGraph, onboarding: Boolean, onBack: (() -> Unit)?
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (onBack != null) TextButton(onClick = onBack) { Text("← Назад") }
-        Text(if (onboarding) "Включим защиту" else "Проверка защиты", style = MaterialTheme.typography.headlineMedium)
+    val done = snapshot.active.size
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        if (onBack != null) BackButton(onBack)
+        HeroCard(
+            title = if (onboarding) "Включим защиту" else "Проверка защиты",
+            subtitle = if (missing.isEmpty()) "Всё готово — телефон под защитой" else "Готово $done из $total. Шаги можно пройти не все сразу",
+            gradient = Gradients.Hero,
+            art = {
+                if (missing.isEmpty()) {
+                    LottieWithFallback(R.raw.lottie_success_check, 132.dp, loop = false) { Illustration(Art3D.Shield, size = 104.dp) }
+                } else {
+                    ProgressRing(done.toFloat() / total.coerceAtLeast(1), 112.dp, stroke = 11.dp) {
+                        Text("${(100f * done / total.coerceAtLeast(1)).toInt()}%", style = MaterialTheme.typography.headlineSmall, color = Color.White)
+                    }
+                }
+            },
+        )
         Text(
-            "Android просит выдать доступы по одному. Мы объясняем, зачем нужен каждый. Шаги можно пройти не все сразу.",
+            "Android просит выдать доступы по одному. Мы объясняем, зачем нужен каждый.",
             style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        ProgressBar((snapshot.active.size.toFloat() / total.coerceAtLeast(1)))
-        Text("${snapshot.active.size} из $total готово", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-
-        if (missing.isEmpty()) {
-            Banner("Всё готово! Телефон под защитой.", Brand.GreenLight, textColor = Brand.GreenDark, emoji = "✅")
-        }
 
         missing.forEach { c ->
             val copy = copyFor(c)
-            SectionCard(container = if (c.critical) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier) {
+            val v = c.visual()
+            SoftCard(padding = 16.dp) {
+                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    IconTile(v.icon, v.gradient, size = 46.dp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(copy.title, style = MaterialTheme.typography.titleMedium)
                         Text(copy.why, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (!c.critical) Text("Необязательно", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (c.critical) LabelChip("Важно для защиты", Brand.GreenLight, Brand.GreenDark)
+                        else LabelChip("По желанию", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                PrimaryButton(if (c.critical) "Разрешить" else "Разрешить (по желанию)") { request(c) }
+                PrimaryButton("Разрешить") { request(c) }
             }
         }
 
-        snapshot.active.toList().forEach { c ->
-            Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("✅", fontSize = 18.sp)
-                Text(copyFor(c).title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (snapshot.active.isNotEmpty()) {
+            SoftCard(padding = 16.dp) {
+                Text("Уже работает", style = MaterialTheme.typography.titleMedium)
+                snapshot.active.toList().forEach { c ->
+                    GlyphLine(copyFor(c).title, Icons.Rounded.Check, Gradients.Emerald, tile = 26.dp, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         val criticalLeft = snapshot.criticalMissing.isNotEmpty()
         PrimaryButton(if (criticalLeft || !onboarding) "Готово" else "Завершить настройку") { onDone() }
         if (onboarding && criticalLeft) {
@@ -166,6 +207,23 @@ fun PermissionWizard(graph: AppGraph, onboarding: Boolean, onBack: (() -> Unit)?
             )
         }
     }
+}
+
+private fun ProtectionComponent.visual(): Visual = when (this) {
+    ProtectionComponent.NOTIFICATIONS -> Visual(Icons.Rounded.Notifications, Gradients.Sunrise)
+    ProtectionComponent.USAGE_ACCESS -> Visual(Icons.Rounded.QueryStats, Gradients.Sky)
+    ProtectionComponent.ACCESSIBILITY -> Visual(Icons.Rounded.AccessibilityNew, Gradients.Violet)
+    ProtectionComponent.NOTIFICATION_ACCESS -> Visual(Icons.Rounded.MarkChatRead, Gradients.Coral)
+    ProtectionComponent.CALL_SCREENING -> Visual(Icons.Rounded.PhoneDisabled, Gradients.Coral)
+    ProtectionComponent.CONTACTS -> Visual(Icons.Rounded.Contacts, Gradients.Emerald)
+    ProtectionComponent.PHONE_STATE -> Visual(Icons.Rounded.PhoneInTalk, Gradients.Emerald)
+    ProtectionComponent.LOCATION -> Visual(Icons.Rounded.LocationOn, Gradients.Ocean)
+    ProtectionComponent.BACKGROUND_LOCATION -> Visual(Icons.Rounded.MyLocation, Gradients.Ocean)
+    ProtectionComponent.VPN_FILTER -> Visual(Icons.Rounded.Language, Gradients.Violet)
+    ProtectionComponent.OVERLAY -> Visual(Icons.Rounded.Layers, Gradients.Slate)
+    ProtectionComponent.DEVICE_ADMIN -> Visual(Icons.Rounded.AdminPanelSettings, Gradients.Danger)
+    ProtectionComponent.BATTERY_OPTIMIZATION -> Visual(Icons.Rounded.BatteryChargingFull, Gradients.Sunrise)
+    ProtectionComponent.FOREGROUND_SERVICE -> Visual(Icons.Rounded.Shield, Gradients.Emerald)
 }
 
 private fun appSettings(context: Context) = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))

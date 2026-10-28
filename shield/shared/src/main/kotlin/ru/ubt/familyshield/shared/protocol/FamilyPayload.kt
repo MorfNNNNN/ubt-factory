@@ -130,10 +130,13 @@ sealed class FamilyPayload {
     @SerialName("task_done")
     data class TaskDone(val taskId: String, val doneAt: Long) : FamilyPayload()
 
-    /** A guardian accepts or returns a done task; accepted tasks come with bonus minutes in a policy update. */
+    /**
+     * A guardian accepts or returns a done task; accepted tasks come with bonus minutes in a policy update.
+     * [task] is the reviewed task with its updated counters, so every device stores the same totals.
+     */
     @Serializable
     @SerialName("task_review")
-    data class TaskReview(val taskId: String, val approved: Boolean, val reviewedAt: Long) : FamilyPayload() {
+    data class TaskReview(val taskId: String, val approved: Boolean, val reviewedAt: Long, val task: FamilyTask? = null) : FamilyPayload() {
         override val requiresGuardianSignature: Boolean get() = true
     }
 

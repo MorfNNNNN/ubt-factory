@@ -116,8 +116,9 @@ class MessageHandler(
             }
             is FamilyPayload.TaskDone -> onTaskDone(senderDeviceId, payload)
             is FamilyPayload.TaskReview -> db.tasks().get(payload.taskId)?.task()?.let { task ->
-                db.tasks().upsert(task.copy(state = if (payload.approved) TaskState.APPROVED else TaskState.DECLINED,
-                    reviewedAt = payload.reviewedAt, updatedAt = payload.reviewedAt).toEntity())
+                val reviewed = payload.task?.takeIf { it.id == task.id && it.assigneeDeviceId == task.assigneeDeviceId }
+                    ?: task.copy(state = if (payload.approved) TaskState.APPROVED else TaskState.DECLINED, reviewedAt = payload.reviewedAt, updatedAt = payload.reviewedAt)
+                db.tasks().upsert(reviewed.toEntity())
                 if (task.assigneeDeviceId == me) {
                     notifier.info(
                         ("task-review-" + task.id).hashCode(),

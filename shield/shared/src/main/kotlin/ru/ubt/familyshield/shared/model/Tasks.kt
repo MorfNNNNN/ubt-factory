@@ -34,6 +34,10 @@ data class FamilyTask(
     val reviewedAt: Long? = null,
     val deleted: Boolean = false,
     val updatedAt: Long = createdAt,
+    /** How many times a guardian accepted this task, and the reward it brought in total. */
+    val approvals: Int = 0,
+    val earnedPoints: Int = 0,
+    val earnedMinutes: Int = 0,
 ) {
     /** The state to show now: a repeating task done in an earlier day/week is open again. */
     fun effectiveState(now: Long, zone: ZoneId = ZoneId.systemDefault()): TaskState {
@@ -53,6 +57,26 @@ data class FamilyTask(
         // Weeks start on Monday in Russia.
         val wf = WeekFields.ISO
         return d.get(wf.weekBasedYear()) to d.get(wf.weekOfWeekBasedYear())
+    }
+}
+
+/** The task after a guardian accepted it: counters grow, the reward is granted separately. */
+fun FamilyTask.approved(now: Long): FamilyTask = copy(
+    state = TaskState.APPROVED, reviewedAt = now, updatedAt = now,
+    approvals = approvals + 1, earnedPoints = earnedPoints + points, earnedMinutes = earnedMinutes + rewardMinutes,
+)
+
+/** Levels a child climbs with points from accepted tasks. */
+enum class HelperLevel(val title: String, val minPoints: Int) {
+    NOVICE("Новичок", 0),
+    HELPER("Помощник", 50),
+    MASTER("Мастер на все руки", 150),
+    HERO("Герой семьи", 300),
+    LEGEND("Легенда", 600);
+
+    companion object {
+        fun of(points: Int): HelperLevel = entries.last { points >= it.minPoints }
+        fun next(points: Int): HelperLevel? = entries.firstOrNull { it.minPoints > points }
     }
 }
 

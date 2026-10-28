@@ -31,6 +31,8 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowSettings
 import ru.ubt.familyshield.core.db.AlertEntity
+import ru.ubt.familyshield.core.db.LocationEntity
+import ru.ubt.familyshield.core.family.toEntity
 import ru.ubt.familyshield.core.db.MemberEntity
 import ru.ubt.familyshield.core.db.NoteEntity
 import ru.ubt.familyshield.core.db.RequestEntity
@@ -45,6 +47,12 @@ import ru.ubt.familyshield.shared.model.AgeBand
 import ru.ubt.familyshield.shared.model.ChildPolicy
 import ru.ubt.familyshield.shared.model.DeviceStatus
 import ru.ubt.familyshield.shared.model.ElderPolicy
+import ru.ubt.familyshield.shared.model.FamilyTask
+import ru.ubt.familyshield.shared.model.GeoPoint
+import ru.ubt.familyshield.shared.model.Geofence
+import ru.ubt.familyshield.shared.model.SafetyProgress
+import ru.ubt.familyshield.shared.model.TaskRepeat
+import ru.ubt.familyshield.shared.model.TaskState
 import ru.ubt.familyshield.shared.model.MemberRequest
 import ru.ubt.familyshield.shared.model.MemberRole
 import ru.ubt.familyshield.shared.model.ProtectionComponent
@@ -75,7 +83,15 @@ import ru.ubt.familyshield.ui.guardian.MemberDetailScreen
 import ru.ubt.familyshield.ui.guardian.SecurityScreen
 import ru.ubt.familyshield.ui.invite.InviteScreen
 import ru.ubt.familyshield.ui.location.LocationMapScreen
+import ru.ubt.familyshield.ui.onboarding.GuardianSetup
+import ru.ubt.familyshield.ui.onboarding.JoinFamily
 import ru.ubt.familyshield.ui.onboarding.OnboardingFlow
+import ru.ubt.familyshield.ui.components.AvatarArt
+import ru.ubt.familyshield.ui.safety.GosProtectionsScreen
+import ru.ubt.familyshield.ui.safety.MemberSafetyScreen
+import ru.ubt.familyshield.ui.safety.SafetySchoolScreen
+import ru.ubt.familyshield.ui.tasks.ChildTasksScreen
+import ru.ubt.familyshield.ui.tasks.GuardianTasksScreen
 import ru.ubt.familyshield.ui.setup.PermissionWizard
 import java.io.File
 
@@ -101,7 +117,13 @@ class StoreScreenshots {
     private val min = 60_000L
 
     @Before
-    fun onlyOnRequest() = assumeTrue(System.getProperty("shield.screenshots") == "true")
+    fun onlyOnRequest() {
+        assumeTrue(System.getProperty("shield.screenshots") == "true")
+        // Store screenshots should show a daytime family: pick the UTC offset where it is about 14:00 now.
+        val utcHour = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC).hour
+        val offset = Math.floorMod(14 - utcHour + 12, 24) - 12
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone(java.time.ZoneOffset.ofHours(offset)))
+    }
 
     private fun shot(name: String) {
         compose.waitForIdle()
@@ -125,11 +147,23 @@ class StoreScreenshots {
         ),
     )
 
-    private val childPolicy = ChildPolicy(ageBand = AgeBand.AGE_10_12, dailyLimitWeekdayMinutes = 150, dailyLimitWeekendMinutes = 210)
+    private val childPolicy = ChildPolicy(
+        ageBand = AgeBand.AGE_10_12, dailyLimitWeekdayMinutes = 150, dailyLimitWeekendMinutes = 210,
+        geofences = listOf(
+            Geofence("g1", "Дом", GeoPoint(55.7012, 37.5703), 150),
+            Geofence("g2", "Школа № 57", GeoPoint(55.7539, 37.6208), 200),
+            Geofence("g3", "Бассейн «Дельфин»", GeoPoint(55.7608, 37.6327), 150, notifyOnExit = false),
+        ),
+    )
+    private val momLearning = SafetyProgress(
+        lessons = mapOf("bank_security" to 3, "relative_trouble" to 3, "gosuslugi" to 2, "officials" to 1),
+        steps = setOf("credit_ban", "code_word", "gos_2fa"),
+        updatedAt = now - 2 * 60 * min,
+    )
     private val elderPolicy = ElderPolicy(
         trustedContacts = listOf(
-            TrustedContact("Анна, дочь", "+7 900 123-45-67", photoEmoji = "👩"),
-            TrustedContact("Сергей, сын", "+7 900 765-43-21", photoEmoji = "👨"),
+            TrustedContact("Анна, дочь", "+7 900 123-45-67", photoEmoji = AvatarArt.MOM.value),
+            TrustedContact("Сергей, сын", "+7 900 765-43-21", photoEmoji = AvatarArt.DAD.value),
         ),
     )
 
@@ -147,15 +181,15 @@ class StoreScreenshots {
         s.setFamily("demo-family", "Семья Ивановых", now - 30 * 24 * 60 * min)
         s.setDevPremium(true)
         when (selfRole) {
-            MemberRole.GUARDIAN -> s.setProfile("Анна", "👩")
-            MemberRole.CHILD -> { s.setProfile("Маша", "👧"); s.setChildPolicy(childPolicy) }
-            else -> { s.setProfile("Мама", "👵"); s.setElderPolicy(elderPolicy); s.setSimpleHome(true) }
+            MemberRole.GUARDIAN -> s.setProfile("Анна", AvatarArt.MOM.value)
+            MemberRole.CHILD -> { s.setProfile("Маша", AvatarArt.GIRL.value); s.setChildPolicy(childPolicy) }
+            else -> { s.setProfile("Мама", AvatarArt.GRANDMA.value); s.setLearning(momLearning); s.setElderPolicy(elderPolicy); s.setSimpleHome(true) }
         }
         val db = graph.db
-        db.members().upsert(MemberEntity("anna", "GUARDIAN", "Анна", "👩", isSelf = selfRole == MemberRole.GUARDIAN, phone = "+7 900 123-45-67", joinedAt = now - 30 * 24 * 60 * min))
+        db.members().upsert(MemberEntity("anna", "GUARDIAN", "Анна", AvatarArt.MOM.value, isSelf = selfRole == MemberRole.GUARDIAN, phone = "+7 900 123-45-67", joinedAt = now - 30 * 24 * 60 * min))
         db.members().upsert(
             MemberEntity(
-                "masha", "CHILD", "Маша", "👧", birthYear = 2014, deviceModel = "Samsung Galaxy A54", androidVersion = 14,
+                "masha", "CHILD", "Маша", AvatarArt.GIRL.value, birthYear = 2014, deviceModel = "Samsung Galaxy A54", androidVersion = 14,
                 isSelf = selfRole == MemberRole.CHILD, joinedAt = now - 29 * 24 * 60 * min, lastSeenAt = now - 3 * min,
                 statusJson = status(76, 95), statusAt = now - 3 * min, todayMinutes = 95,
                 lastLat = 55.7539, lastLon = 37.6208, lastAccuracy = 20f, lastLocationAt = now - 6 * min, lastAddress = "Школа № 57",
@@ -164,11 +198,12 @@ class StoreScreenshots {
         )
         db.members().upsert(
             MemberEntity(
-                "mama", "ELDER", "Мама", "👵", birthYear = 1956, deviceModel = "Xiaomi Redmi Note 12", androidVersion = 13,
+                "mama", "ELDER", "Мама", AvatarArt.GRANDMA.value, birthYear = 1956, deviceModel = "Xiaomi Redmi Note 12", androidVersion = 13,
                 isSelf = selfRole == MemberRole.ELDER, joinedAt = now - 28 * 24 * 60 * min, lastSeenAt = now - 8 * min,
                 statusJson = status(54), statusAt = now - 8 * min, lastCheckInAt = now - 95 * min,
                 lastLat = 55.7012, lastLon = 37.5703, lastAccuracy = 25f, lastLocationAt = now - 20 * min, lastAddress = "Дом",
                 policyJson = ShieldJson.encodeToString(ElderPolicy.serializer(), elderPolicy),
+                learningJson = ShieldJson.encodeToString(SafetyProgress.serializer(), momLearning),
             ),
         )
     }
@@ -205,7 +240,25 @@ class StoreScreenshots {
         db.requests().upsert(RequestEntity("r1", "masha", "MORE_TIME", ShieldJson.encodeToString(MemberRequest.serializer(), more), more.createdAt))
         val app = MemberRequest("r2", RequestKind.APP_APPROVAL, now - 25 * min, packageName = "com.duolingo", appLabel = "Duolingo")
         db.requests().upsert(RequestEntity("r2", "masha", "APP_APPROVAL", ShieldJson.encodeToString(MemberRequest.serializer(), app), app.createdAt))
-        db.notes().insert(NoteEntity("n1", "mama", "Я дома, всё хорошо 😊", createdAt = now - 90 * min, mine = false))
+        listOf(
+            FamilyTask("t1", "masha", "Сделать уроки", "homework", 20, 15, TaskRepeat.DAILY, createdBy = "anna", createdAt = now - 6 * 86_400_000L,
+                approvals = 3, earnedPoints = 45, earnedMinutes = 60),
+            FamilyTask("t2", "masha", "Убрать в комнате", "room", 15, 10, TaskRepeat.WEEKLY, createdBy = "anna", createdAt = now - 5 * 86_400_000L,
+                state = TaskState.DONE, doneAt = now - 18 * min),
+            FamilyTask("t3", "masha", "Погулять с собакой", "pet", 10, 10, TaskRepeat.DAILY, createdBy = "anna", createdAt = now - 4 * 86_400_000L,
+                state = TaskState.APPROVED, doneAt = now - 150 * min, reviewedAt = now - 120 * min, approvals = 5, earnedPoints = 50, earnedMinutes = 50),
+            FamilyTask("t4", "masha", "Позвонить бабушке", "grandma", 10, 10, TaskRepeat.WEEKLY, createdBy = "anna", createdAt = now - 3 * 86_400_000L),
+        ).forEach { db.tasks().upsert(it.toEntity()) }
+        listOf(
+            Triple(now - 360 * min, "Дом", GeoPoint(55.7012, 37.5703)),
+            Triple(now - 340 * min, "Бассейн «Дельфин»", GeoPoint(55.7608, 37.6327)),
+            Triple(now - 300 * min, "Бассейн «Дельфин»", GeoPoint(55.7608, 37.6327)),
+            Triple(now - 260 * min, "Бассейн «Дельфин»", GeoPoint(55.7608, 37.6327)),
+            Triple(now - 230 * min, "Школа № 57", GeoPoint(55.7539, 37.6208)),
+            Triple(now - 120 * min, "Школа № 57", GeoPoint(55.7539, 37.6208)),
+            Triple(now - 6 * min, "Школа № 57", GeoPoint(55.7539, 37.6208)),
+        ).forEach { (t, place, p) -> db.locations().insert(LocationEntity(deviceId = "masha", lat = p.lat, lon = p.lon, accuracy = 20f, time = t, address = place)) }
+        db.notes().insert(NoteEntity("n1", "mama", "Я дома, всё хорошо", createdAt = now - 90 * min, mine = false))
         db.notes().insert(NoteEntity("n2", "anna", "Отлично! Вечером заеду", createdAt = now - 85 * min, mine = true))
     }
 
@@ -263,6 +316,15 @@ class StoreScreenshots {
         Screen("18-consent", MemberRole.ELDER) { _, _ -> ConsentScreen(MemberRole.ELDER, onBack = {}, onContinue = {}) },
         Screen("19-welcome", MemberRole.GUARDIAN) { _, _ -> OnboardingFlow(graph, null) {} },
         Screen("20-permissions", MemberRole.ELDER) { _, _ -> PermissionWizard(graph, onboarding = true, onBack = null) {} },
+        Screen("21-tasks-parent", MemberRole.GUARDIAN) { _, state -> GuardianTasksScreen(graph, state.member("masha")) {} },
+        Screen("22-tasks-child", MemberRole.CHILD) { _, _ -> ChildTasksScreen(graph) {} },
+        Screen("23-school", MemberRole.ELDER) { _, _ -> SafetySchoolScreen(graph) {} },
+        Screen("24-lesson", MemberRole.ELDER, tab("Начать урок")) { _, _ -> SafetySchoolScreen(graph) {} },
+        Screen("25-gos", MemberRole.ELDER) { _, _ -> GosProtectionsScreen(graph) {} },
+        Screen("26-mom-safety", MemberRole.GUARDIAN) { _, state -> MemberSafetyScreen(state.member("mama")) {} },
+        Screen("27-roles", MemberRole.GUARDIAN, tab("Пропустить")) { _, _ -> OnboardingFlow(graph, null) {} },
+        Screen("28-create-family", MemberRole.GUARDIAN) { _, _ -> GuardianSetup(graph, {}, {}) },
+        Screen("29-join", MemberRole.CHILD) { _, _ -> JoinFamily(graph, null, {}) {} },
     )
 
     /** One process, one DataStore: every screen is drawn in turn into the same window. */

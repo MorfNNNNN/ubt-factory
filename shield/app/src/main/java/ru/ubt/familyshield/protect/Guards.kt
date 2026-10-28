@@ -314,7 +314,7 @@ class MessageGuard(
         if (verdict.level < RiskLevel.MEDIUM) return
         val top = verdict.top ?: return
         notifier.warning(
-            "⚠ ${top.type.titleRu}",
+            top.type.titleRu,
             "Сообщение в «${appLabel(pkg)}» похоже на мошенничество. ${verdict.advice.orEmpty()}",
         )
         alerts.journal("SCAM_MESSAGE", top.type.titleRu, verdict.reasons.joinToString("; "), pkg)

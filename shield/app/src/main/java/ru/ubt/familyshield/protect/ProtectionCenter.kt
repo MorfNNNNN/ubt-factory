@@ -226,7 +226,7 @@ class ProtectionCenter(
         override suspend fun onDecision(decision: RequestDecision) {
             val text = if (decision.approved) "Родители одобрили ваш запрос" + (decision.minutes?.let { ": +$it мин" } ?: "") else "Родители отклонили запрос" +
                 decision.note.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty()
-            notifier.info(Notifier.ID_LIMIT + 1, if (decision.approved) "Одобрено 👍" else "Отклонено", text, "child")
+            notifier.info(Notifier.ID_LIMIT + 1, if (decision.approved) "Одобрено" else "Отклонено", text, "child")
         }
 
         override suspend fun onNote(from: String, note: FamilyNote) = notifier.note(note.id, from, note.text)

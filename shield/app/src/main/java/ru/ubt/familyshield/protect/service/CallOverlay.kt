@@ -26,7 +26,7 @@ object CallOverlay {
     private fun dp(context: Context, v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, context.resources.displayMetrics).toInt()
 
     fun showIncomingWarning(context: Context, number: String, reasons: List<String>, high: Boolean) {
-        val title = if (high) "⚠ Осторожно: вероятно мошенники" else "Звонит незнакомый номер"
+        val title = if (high) "Осторожно: вероятно мошенники" else "Звонит незнакомый номер"
         val body = buildString {
             append(number)
             reasons.take(2).forEach { append("\n• ").append(it) }

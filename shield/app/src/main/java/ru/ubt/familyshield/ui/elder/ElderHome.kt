@@ -1,5 +1,6 @@
 package ru.ubt.familyshield.ui.elder
 
+import androidx.annotation.DrawableRes
 import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
@@ -65,12 +66,16 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import ru.ubt.familyshield.AppGraph
 import ru.ubt.familyshield.protect.ui.SosActivity
+import ru.ubt.familyshield.shared.content.GosProtections
 import ru.ubt.familyshield.shared.model.MedicationReminder
 import ru.ubt.familyshield.shared.model.MemberRole
+import ru.ubt.familyshield.shared.model.SafetyProgress
 import ru.ubt.familyshield.shared.model.TrustedContact
 import ru.ubt.familyshield.shared.policy.formatMinuteOfDay
 import ru.ubt.familyshield.ui.FamilyUiState
 import ru.ubt.familyshield.ui.ShieldViewModel
+import ru.ubt.familyshield.ui.components.Art3D
+import ru.ubt.familyshield.ui.components.ArtTile
 import ru.ubt.familyshield.ui.components.AvatarImage
 import ru.ubt.familyshield.ui.components.ColumnScreen
 import ru.ubt.familyshield.ui.components.GlassIcon
@@ -81,6 +86,9 @@ import ru.ubt.familyshield.ui.components.ScreenScaffold
 import ru.ubt.familyshield.ui.components.SoftCard
 import ru.ubt.familyshield.ui.components.SosPulse
 import ru.ubt.familyshield.ui.components.timeOf
+import ru.ubt.familyshield.ui.safety.GosProtectionsScreen
+import ru.ubt.familyshield.ui.safety.SafetySchoolScreen
+import ru.ubt.familyshield.ui.safety.lessonsFor
 import ru.ubt.familyshield.ui.setup.PermissionWizard
 import ru.ubt.familyshield.ui.theme.Brand
 import ru.ubt.familyshield.ui.theme.Gradients
@@ -106,6 +114,8 @@ fun ElderHome(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState, activi
         "permissions" -> { PermissionWizard(graph, onboarding = false, onBack = { screen = "home" }) { screen = "home" }; return }
         "settings" -> { ElderSettings(graph, state) { screen = "home" }; return }
         "medications" -> { ElderMedications(state.settings.elderPolicy.medications) { screen = "home" }; return }
+        "school" -> { SafetySchoolScreen(graph) { screen = "home" }; return }
+        "gos" -> { GosProtectionsScreen(graph) { screen = "home" }; return }
     }
 
     val health = remember(state.settings) { graph.protection.health.snapshot(MemberRole.ELDER, state.settings.childPolicy, state.settings.elderPolicy) }
@@ -139,7 +149,35 @@ fun ElderHome(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState, activi
         }
         AppRow(apps[0], apps[1])
         CheckerTile { screen = "checker" }
+        LearnTile(Art3D.Notebook, "Уроки безопасности", schoolHint(state.settings.learning)) { screen = "school" }
+        LearnTile(Art3D.Shield, "Госуслуги и банк", gosHint(state.settings.learning)) { screen = "gos" }
         apps.drop(2).chunked(2).forEach { AppRow(it[0], it.getOrNull(1)) }
+    }
+}
+
+private fun schoolHint(p: SafetyProgress): String {
+    val lessons = lessonsFor(MemberRole.ELDER)
+    val passed = lessons.count { p.passed(it.id) }
+    return if (passed == 0) "Как распознать мошенника — по 3 минуты" else "Пройдено $passed из ${lessons.size}"
+}
+
+private fun gosHint(p: SafetyProgress): String {
+    val done = GosProtections.steps.count { it.id in p.steps }
+    return if (done == 0) "Запрет на кредиты и другие меры" else "Сделано $done из ${GosProtections.steps.size}"
+}
+
+/** A wide card with 3D art: lessons and the official-protection checklist. */
+@Composable
+private fun LearnTile(@DrawableRes art: Int, title: String, subtitle: String, onClick: () -> Unit) {
+    SoftCard(onClick = onClick, padding = 16.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            ArtTile(art, size = 68.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+        }
     }
 }
 

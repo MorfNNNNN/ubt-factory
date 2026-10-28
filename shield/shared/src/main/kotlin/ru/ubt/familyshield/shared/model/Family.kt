@@ -36,7 +36,7 @@ data class MemberProfile(
     val deviceId: String,
     val role: MemberRole,
     val displayName: String,
-    val avatar: String = "🙂",
+    val avatar: String = "",
     val birthYear: Int? = null,
     val deviceModel: String = "",
     val androidVersion: Int = 0,
@@ -50,7 +50,7 @@ data class TrustedContact(
     val name: String,
     val phone: String,
     val isSosTarget: Boolean = true,
-    val photoEmoji: String = "👤",
+    val photoEmoji: String = "",
 )
 
 @Serializable

@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Battery2Bar
+import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.GppGood
 import androidx.compose.material.icons.rounded.GppMaybe
 import androidx.compose.material.icons.rounded.HourglassBottom
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.rounded.PauseCircle
 import androidx.compose.material.icons.rounded.PersonRemove
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.RingVolume
+import androidx.compose.material.icons.rounded.School
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.SignalCellularAlt
 import androidx.compose.material.icons.rounded.Tune
@@ -69,11 +71,15 @@ import ru.ubt.familyshield.ui.components.TileRow
 import ru.ubt.familyshield.ui.components.relativeTime
 import ru.ubt.familyshield.ui.components.visual
 import ru.ubt.familyshield.ui.location.LocationMapScreen
+import ru.ubt.familyshield.ui.safety.MemberSafetyScreen
+import ru.ubt.familyshield.ui.safety.safetySummary
+import ru.ubt.familyshield.ui.tasks.GuardianTasksScreen
+import ru.ubt.familyshield.ui.tasks.taskSummary
 import ru.ubt.familyshield.ui.theme.Brand
 import ru.ubt.familyshield.ui.theme.Gradients
 import java.util.UUID
 
-private enum class Detail { OVERVIEW, CONTROLS, LOCATION, APPS, SECURITY }
+private enum class Detail { OVERVIEW, CONTROLS, LOCATION, APPS, SECURITY, TASKS, SAFETY }
 
 @Composable
 fun MemberDetailScreen(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState, member: MemberEntity, onBack: () -> Unit) {
@@ -88,6 +94,8 @@ fun MemberDetailScreen(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiStat
         Detail.LOCATION -> LocationMapScreen(graph, member) { screen = Detail.OVERVIEW }
         Detail.APPS -> AppsScreen(graph, member) { screen = Detail.OVERVIEW }
         Detail.SECURITY -> SecurityScreen(graph, member) { screen = Detail.OVERVIEW }
+        Detail.TASKS -> GuardianTasksScreen(graph, member) { screen = Detail.OVERVIEW }
+        Detail.SAFETY -> MemberSafetyScreen(member) { screen = Detail.OVERVIEW }
     }
 }
 
@@ -148,8 +156,10 @@ private fun Overview(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState,
                         icon = Icons.Rounded.LocationOn, gradient = Gradients.Ocean,
                     ) { open(Detail.LOCATION) }
                     if (isChild) {
+                        TileRow("Задания и награды", subtitle = taskSummary(graph, member.deviceId), icon = Icons.Rounded.EmojiEvents, gradient = Gradients.Sunrise) { open(Detail.TASKS) }
                         TileRow("Приложения и экранное время", subtitle = "Что установлено и что заблокировано", icon = Icons.Rounded.Apps, gradient = Gradients.Violet) { open(Detail.APPS) }
                     }
+                    TileRow("Школа безопасности", subtitle = safetySummary(member), icon = Icons.Rounded.School, gradient = Gradients.Violet) { open(Detail.SAFETY) }
                     TileRow(
                         "Безопасность телефона",
                         subtitle = score?.let { "Оценка защищённости: $it/100" } ?: "Проверка угроз и настроек",

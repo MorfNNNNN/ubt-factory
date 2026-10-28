@@ -11,22 +11,37 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.material.icons.rounded.PanTool
+import androidx.compose.material.icons.rounded.Sos
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,11 +55,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -60,7 +82,15 @@ import ru.ubt.familyshield.shared.policy.BlockReason
 import ru.ubt.familyshield.shared.policy.formatMinuteOfDay
 import ru.ubt.familyshield.shared.protocol.Audience
 import ru.ubt.familyshield.shared.protocol.FamilyPayload
+import ru.ubt.familyshield.ui.components.Art3D
+import ru.ubt.familyshield.ui.components.GlassIcon
+import ru.ubt.familyshield.ui.components.Illustration
+import ru.ubt.familyshield.ui.components.MintPanel
+import ru.ubt.familyshield.ui.components.NoticeCard
+import ru.ubt.familyshield.ui.components.ProgressRing
+import ru.ubt.familyshield.ui.components.SosPulse
 import ru.ubt.familyshield.ui.theme.Brand
+import ru.ubt.familyshield.ui.theme.Gradients
 import ru.ubt.familyshield.ui.theme.ShieldTheme
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -84,14 +114,33 @@ private fun ComponentActivity.showOverLockScreen() {
     }
 }
 
+/** Large rounded button: white on coloured screens, brand gradient on light ones. */
 @Composable
-private fun BigButton(text: String, color: Color = MaterialTheme.colorScheme.primary, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(64.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = color, contentColor = Color.White),
-    ) { Text(text, fontSize = 20.sp, fontWeight = FontWeight.SemiBold) }
+private fun BigButton(
+    text: String,
+    icon: ImageVector? = null,
+    fill: Brush = Gradients.Emerald,
+    content: Color = Color.White,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().height(64.dp)
+            .shadow(10.dp, MaterialTheme.shapes.medium, ambientColor = Color.Black.copy(alpha = 0.2f), spotColor = Color.Black.copy(alpha = 0.2f))
+            .clip(MaterialTheme.shapes.medium).background(fill)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(26.dp))
+            Spacer(Modifier.width(10.dp))
+        }
+        Text(text, color = content, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
 }
+
+private val White = SolidColor(Color.White)
 
 /** Shown to a child when an app is not available right now. */
 class BlockActivity : ComponentActivity() {
@@ -133,20 +182,23 @@ class BlockActivity : ComponentActivity() {
         var sent by remember { mutableStateOf<String?>(null) }
         var pin by remember { mutableStateOf("") }
         var pinError by remember { mutableStateOf(false) }
-        val emoji = when {
-            tamper -> "🔒"
-            reason == BlockReason.SCHEDULE -> if (detail.contains("Сон")) "🌙" else "📚"
-            reason == BlockReason.PAUSED -> "⏸️"
-            reason == BlockReason.PENDING_APPROVAL -> "🕐"
-            else -> "⏳"
+        val art = when {
+            tamper -> Art3D.Lock
+            reason == BlockReason.SCHEDULE -> if (detail.contains("Сон")) Art3D.Moon else Art3D.Notebook
+            reason == BlockReason.PAUSED -> Art3D.Clock
+            reason == BlockReason.PENDING_APPROVAL -> Art3D.Bell
+            reason == BlockReason.BYPASS_TOOL -> Art3D.Shield
+            else -> Art3D.Stopwatch
         }
         Column(
             Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).systemBarsPadding().padding(24.dp).verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Spacer(Modifier.height(32.dp))
-            Text(emoji, fontSize = 72.sp)
+            Spacer(Modifier.height(12.dp))
+            MintPanel(Modifier.fillMaxWidth().height(220.dp)) {
+                Illustration(art, Modifier.align(Alignment.Center), size = 168.dp)
+            }
             Text(
                 if (tamper) "Эти настройки защищены" else reason?.titleRu ?: "Недоступно",
                 style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center,
@@ -170,7 +222,7 @@ class BlockActivity : ComponentActivity() {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                BigButton("Разблокировать на 10 минут") {
+                BigButton("Разблокировать на 10 минут", Icons.Rounded.LockOpen) {
                     val hash = graph.settings.current.childPolicy.parentPin
                     if (hash != null && hash.matches(pin)) {
                         graph.protection.child.tamperUnlockedUntil = System.currentTimeMillis() + 10 * 60_000L
@@ -181,23 +233,31 @@ class BlockActivity : ComponentActivity() {
                 }
             } else if (reason in setOf(BlockReason.DAILY_LIMIT, BlockReason.APP_LIMIT, BlockReason.CATEGORY_LIMIT, BlockReason.SCHEDULE)) {
                 if (sent == null) {
-                    Text("Попросить ещё времени:", style = MaterialTheme.typography.titleMedium)
-                    for (m in listOf(15, 30, 60)) {
-                        OutlinedButton(onClick = {
-                            scope.launch {
-                                graph.sync.send(
-                                    FamilyPayload.Request(MemberRequest(UUID.randomUUID().toString(), RequestKind.MORE_TIME, System.currentTimeMillis(), minutes = m, packageName = pkg, appLabel = label)),
-                                    Audience.GUARDIANS, urgent = true,
-                                )
-                                sent = "Запрос на $m минут отправлен родителям"
-                            }
-                        }, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("+$m минут", fontSize = 18.sp) }
+                    Text("Попросить ещё времени", style = MaterialTheme.typography.titleMedium)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        for (m in listOf(15, 30, 60)) {
+                            Box(
+                                Modifier.weight(1f).height(58.dp).clip(MaterialTheme.shapes.medium)
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), MaterialTheme.shapes.medium)
+                                    .clickable(role = Role.Button) {
+                                        scope.launch {
+                                            graph.sync.send(
+                                                FamilyPayload.Request(MemberRequest(UUID.randomUUID().toString(), RequestKind.MORE_TIME, System.currentTimeMillis(), minutes = m, packageName = pkg, appLabel = label)),
+                                                Audience.GUARDIANS, urgent = true,
+                                            )
+                                            sent = "Запрос на $m минут отправлен родителям"
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) { Text("+$m мин", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary) }
+                        }
                     }
                 } else {
-                    Text(sent!!, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.Center)
+                    NoticeCard(sent!!, Icons.Rounded.CheckCircle, Brand.GreenLight, Brand.GreenDark)
                 }
             }
-            BigButton("На главный экран") { goHome() }
+            BigButton("На главный экран", Icons.Rounded.Home) { goHome() }
         }
     }
 }
@@ -249,26 +309,27 @@ class WarningActivity : ComponentActivity() {
                 "Нажмите «Отмена» и положите трубку.",
             )
         }
-        Box(Modifier.fillMaxSize().background(Brand.Danger)) {
+        Box(Modifier.fillMaxSize().background(Gradients.Danger)) {
             Column(
                 Modifier.fillMaxSize().systemBarsPadding().padding(24.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text("⛔", fontSize = 64.sp)
-                Text(title, color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold, lineHeight = 36.sp)
-                lines.forEach { Text("• $it", color = Color.White, fontSize = 21.sp, lineHeight = 28.sp) }
+                GlassIcon(Icons.Rounded.PanTool, size = 84.dp)
+                Text(title, color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 36.sp)
+                lines.forEach { line ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(Modifier.padding(top = 10.dp).size(9.dp).clip(CircleShape).background(Color.White))
+                        Text(line, color = Color.White, fontSize = 21.sp, lineHeight = 28.sp, modifier = Modifier.weight(1f))
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
                 contacts.take(3).forEach { c ->
-                    BigButton("📞 Позвонить: ${c.name}", color = Color(0xFF14532D)) {
+                    BigButton("Позвонить: ${c.name}", Icons.Rounded.Call, fill = Gradients.Emerald) {
                         graph.protection.sos.call(c.phone)
                         finish()
                     }
                 }
-                Button(
-                    onClick = { finish() },
-                    modifier = Modifier.fillMaxWidth().height(60.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Brand.Danger),
-                ) { Text("Я понял(а)", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+                BigButton("Я понял(а)", fill = White, content = Brand.Danger) { finish() }
             }
         }
     }
@@ -293,17 +354,20 @@ class FallActivity : ComponentActivity() {
                     finish()
                 }
                 Column(
-                    Modifier.fillMaxSize().background(Brand.Warning).systemBarsPadding().padding(24.dp),
+                    Modifier.fillMaxSize().background(Gradients.Sunrise).systemBarsPadding().padding(24.dp),
                     verticalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterVertically),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("Похоже, вы упали", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                    ProgressRing(left / 30f, 168.dp, stroke = 12.dp) {
+                        Text("$left", color = Color.White, fontSize = 56.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                    Text("Похоже, вы упали", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
                     Text("Через $left сек мы сообщим близким", color = Color.White, fontSize = 22.sp, textAlign = TextAlign.Center)
-                    BigButton("Я в порядке", color = Brand.GreenDark) {
+                    BigButton("Я в порядке", Icons.Rounded.Favorite, fill = Gradients.Emerald) {
                         graph.protection.ringer.stop()
                         finish()
                     }
-                    BigButton("Нужна помощь", color = Brand.Danger) {
+                    BigButton("Нужна помощь", Icons.Rounded.Sos, fill = White, content = Brand.Danger) {
                         graph.protection.ringer.stop()
                         graph.protection.sos.trigger(AlertType.FALL_DETECTED)
                         finish()
@@ -322,13 +386,14 @@ class RingActivity : ComponentActivity() {
         setContent {
             ShieldTheme {
                 Column(
-                    Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primary).systemBarsPadding().padding(24.dp),
+                    Modifier.fillMaxSize().background(Gradients.Hero).systemBarsPadding().padding(24.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("🔔", fontSize = 80.sp)
-                    Text("Вас ищут близкие", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-                    BigButton("Выключить звук", color = Brand.Navy) {
+                    Illustration(Art3D.Bell, size = 180.dp)
+                    Text("Вас ищут близкие", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+                    Text("Телефон звонит, чтобы его было легко найти", color = Color.White.copy(alpha = 0.9f), fontSize = 20.sp, textAlign = TextAlign.Center)
+                    BigButton("Выключить звук", Icons.AutoMirrored.Rounded.VolumeOff, fill = White, content = Brand.GreenDark) {
                         graph.protection.ringer.stop()
                         finish()
                     }
@@ -356,17 +421,17 @@ class SosActivity : ComponentActivity() {
                     sent = true
                 }
                 Column(
-                    Modifier.fillMaxSize().background(Brand.Danger).systemBarsPadding().padding(24.dp),
+                    Modifier.fillMaxSize().background(Gradients.Danger).systemBarsPadding().padding(24.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("SOS", color = Color.White, fontSize = 72.sp, fontWeight = FontWeight.Black)
+                    SosPulse(300.dp)
                     if (!sent) {
-                        Text("Вызов помощи через $left сек", color = Color.White, fontSize = 26.sp, textAlign = TextAlign.Center)
-                        BigButton("Отменить", color = Brand.Navy) { finish() }
+                        Text("Вызов помощи через $left сек", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                        BigButton("Отменить", Icons.Rounded.Close, fill = White, content = Brand.Danger) { finish() }
                     } else {
-                        Text("Близкие получили тревогу и ваше местоположение. Звоним…", color = Color.White, fontSize = 24.sp, textAlign = TextAlign.Center)
-                        BigButton("Закрыть", color = Brand.Navy) { finish() }
+                        Text("Близкие получили тревогу и ваше местоположение. Звоним…", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                        BigButton("Закрыть", Icons.Rounded.Check, fill = White, content = Brand.Danger) { finish() }
                     }
                 }
             }

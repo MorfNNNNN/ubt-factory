@@ -1,18 +1,22 @@
 package ru.ubt.familyshield.ui.onboarding
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,12 +24,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import ru.ubt.familyshield.R
 import ru.ubt.familyshield.shared.model.MemberRole
+import ru.ubt.familyshield.ui.components.Art3D
+import ru.ubt.familyshield.ui.components.GlyphLine
+import ru.ubt.familyshield.ui.components.Illustration
+import ru.ubt.familyshield.ui.components.LottieWithFallback
+import ru.ubt.familyshield.ui.components.NoticeCard
 import ru.ubt.familyshield.ui.components.PrimaryButton
-import ru.ubt.familyshield.ui.components.SectionCard
+import ru.ubt.familyshield.ui.components.SoftCard
+import ru.ubt.familyshield.ui.theme.Gradients
 
 /**
  * Plain-language consent shown on the protected device before it joins a family. Honest disclosure
@@ -60,28 +72,47 @@ fun ConsentScreen(role: MemberRole, onBack: () -> Unit, onContinue: () -> Unit) 
             "видеть ваши пароли и коды",
         )
     }
-    Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        TextButton(onClick = onBack) { Text("← Назад") }
-        Text("Честно о том, как это работает", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            "Этот телефон будет подключён к семье. Важно, чтобы вы понимали, что увидят близкие, а что останется только вашим.",
-            style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+    OnboardingPage(
+        title = "Честно о том, как это работает",
+        text = "Этот телефон будет подключён к семье. Важно, чтобы вы понимали, что увидят близкие, а что останется только вашим.",
+        onBack = onBack,
+        art = { LottieWithFallback(R.raw.lottie_lock_secure, 170.dp, Modifier.align(Alignment.Center), loop = false) { Illustration(Art3D.Lock, size = 120.dp) } },
+    ) {
+        SoftCard(padding = 18.dp) {
+            Text("Близкие будут видеть", style = MaterialTheme.typography.titleMedium)
+            sees.forEach { GlyphLine(it, Icons.Rounded.Check, Gradients.Emerald, tile = 30.dp, style = MaterialTheme.typography.bodyLarge) }
+        }
+        SoftCard(padding = 18.dp) {
+            Text("Приложение не будет", style = MaterialTheme.typography.titleMedium)
+            doesNot.forEach { GlyphLine(it, Icons.Rounded.Close, Gradients.Slate, tile = 30.dp, style = MaterialTheme.typography.bodyLarge) }
+        }
+        NoticeCard(
+            "Защиту можно отключить в любой момент. На телефоне всегда видно, что он под защитой семьи.",
+            Icons.Rounded.PowerSettingsNew, MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        SectionCard(title = "Близкие будут видеть", container = MaterialTheme.colorScheme.primaryContainer) {
-            sees.forEach { Text("✓  $it", style = MaterialTheme.typography.bodyLarge) }
-        }
-        SectionCard(title = "Приложение НЕ будет") {
-            doesNot.forEach { Text("✕  $it", style = MaterialTheme.typography.bodyLarge) }
-        }
-        Text(
-            "Защиту можно отключить в любой момент. На телефоне всегда показано, что он под защитой семьи.",
-            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = agreed, onCheckedChange = { agreed = it })
-            Text("Я понимаю и согласен(на) подключить этот телефон", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-        }
-        Spacer(Modifier.height(4.dp))
+        AgreeRow(agreed) { agreed = it }
         PrimaryButton("Продолжить", enabled = agreed, onClick = onContinue)
+    }
+}
+
+@Composable
+private fun AgreeRow(checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)
+            .toggleable(value = checked, role = Role.Checkbox, onValueChange = onChange)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        val shape = RoundedCornerShape(9.dp)
+        Box(
+            Modifier.size(30.dp).clip(shape)
+                .background(if (checked) Gradients.Emerald else androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.surface))
+                .border(if (checked) 0.dp else 2.dp, MaterialTheme.colorScheme.outline, shape),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (checked) Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+        }
+        Text("Я понимаю и согласен(на) подключить этот телефон", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
     }
 }

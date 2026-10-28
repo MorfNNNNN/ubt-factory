@@ -23,6 +23,7 @@ import ru.ubt.familyshield.shared.protocol.FamilyPayload
 import ru.ubt.familyshield.shared.model.FamilyTask
 import ru.ubt.familyshield.shared.model.TaskRepeat
 import ru.ubt.familyshield.shared.model.TaskState
+import ru.ubt.familyshield.shared.model.approved
 import java.time.LocalDate
 import java.util.UUID
 
@@ -124,8 +125,9 @@ class GuardianActions(
     suspend fun reviewTask(taskId: String, approved: Boolean) {
         val task = loadTask(taskId) ?: return
         val now = clock()
-        saveTask(task.copy(state = if (approved) TaskState.APPROVED else TaskState.DECLINED, reviewedAt = now, updatedAt = now))
-        sender().send(FamilyPayload.TaskReview(taskId, approved, now), Audience.DEVICES, recipients(task.assigneeDeviceId), urgent = true)
+        val reviewed = if (approved) task.approved(now) else task.copy(state = TaskState.DECLINED, reviewedAt = now, updatedAt = now)
+        saveTask(reviewed)
+        sender().send(FamilyPayload.TaskReview(taskId, approved, now, reviewed), Audience.DEVICES, recipients(task.assigneeDeviceId), urgent = true)
         if (approved && task.rewardMinutes > 0) bonus(task.assigneeDeviceId, task.rewardMinutes, "Задание: ${task.title}")
     }
 
