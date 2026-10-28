@@ -34,6 +34,14 @@ jobs:
             if timeout 10 bash -c "exec 3<>/dev/tcp/$SERVER_HOST/$port"; then echo "port $port: open"; else echo "port $port: closed or filtered"; fi
           done
           curl -sS -m 10 -o /dev/null -w "http://$SERVER_HOST/health: %{http_code}\n" "http://$SERVER_HOST/health" || true
+          curl -sS -m 10 -o /dev/null -w "http://$SHIELD_DOMAIN/: %{http_code} -> %{redirect_url}\n" "http://$SHIELD_DOMAIN/" || true
+      - name: HTTPS certificate and pages
+        run: |
+          echo | timeout 20 openssl s_client -connect "$SERVER_HOST:443" -servername "$SHIELD_DOMAIN" 2>&1 \
+            | grep -E 'subject=|issuer=|Verify return code|alert|errno|CONNECTED' | head -6 || true
+          for path in /health /privacy /terms /v1/billing/public-key; do
+            curl -sS -m 15 -o /dev/null -w "https://$SHIELD_DOMAIN$path: %{http_code}\n" "https://$SHIELD_DOMAIN$path" || true
+          done
       - name: DNS
         run: |
           echo "NS:  $(dig +short NS "$SHIELD_DOMAIN" | tr '\n' ' ')"
