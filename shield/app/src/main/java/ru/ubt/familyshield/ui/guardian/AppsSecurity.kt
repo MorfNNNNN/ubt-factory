@@ -70,6 +70,7 @@ import ru.ubt.familyshield.shared.model.Command
 import ru.ubt.familyshield.shared.model.InstalledApp
 import ru.ubt.familyshield.shared.model.SecurityReport
 import ru.ubt.familyshield.shared.policy.formatMinutes
+import ru.ubt.familyshield.ui.components.Art3D
 import ru.ubt.familyshield.ui.components.HeroCard
 import ru.ubt.familyshield.ui.components.IconTile
 import ru.ubt.familyshield.ui.components.Illustration
@@ -106,7 +107,12 @@ fun AppsScreen(graph: AppGraph, member: MemberEntity, onBack: () -> Unit) {
                 ArtEmptyState(
                     "Список обновляется",
                     "Как только телефон ребёнка выйдет на связь, здесь появятся приложения и экранное время.",
-                ) { Illustration(R.drawable.ill_child_tablet, size = 220.dp) }
+                ) {
+                    Box(Modifier.size(200.dp), contentAlignment = Alignment.Center) {
+                        Illustration(Art3D.Mobile, size = 160.dp)
+                        Illustration(Art3D.Stopwatch, Modifier.align(Alignment.BottomEnd), size = 86.dp)
+                    }
+                }
             }
             return@DetailScaffold
         }

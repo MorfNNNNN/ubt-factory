@@ -1,5 +1,6 @@
 package ru.ubt.familyshield.ui.onboarding
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -59,6 +60,7 @@ import kotlinx.coroutines.launch
 import ru.ubt.familyshield.AppGraph
 import ru.ubt.familyshield.R
 import ru.ubt.familyshield.shared.model.MemberRole
+import ru.ubt.familyshield.ui.components.Art3D
 import ru.ubt.familyshield.ui.components.AvatarArt
 import ru.ubt.familyshield.ui.components.AvatarImage
 import ru.ubt.familyshield.ui.components.CroppedIllustration
@@ -155,12 +157,12 @@ private fun BoxScope.SlideArt(page: Int) {
     when (page) {
         0 -> FamilyArt()
         1 -> {
-            PersonArt(R.drawable.ill_elder_phone, cropBottom = 0.1f)
-            FloatingNote(Icons.Rounded.PhoneDisabled, Gradients.Coral, "Звонок мошенника", "заблокирован", Modifier.align(Alignment.TopStart).padding(16.dp))
+            PortraitArt(AvatarArt.GRANDMA, Art3D.CallRinging, propOnLeft = false)
+            FloatingNote(Icons.Rounded.PhoneDisabled, Gradients.Coral, "Звонок мошенника", "заблокирован", Modifier.align(Alignment.BottomCenter).padding(16.dp))
         }
         2 -> {
-            PersonArt(R.drawable.ill_child_tablet, cropBottom = 0.12f)
-            FloatingNote(Icons.Rounded.HourglassBottom, Gradients.Sky, "Экранное время", "1 ч 35 мин из 2 ч", Modifier.align(Alignment.TopEnd).padding(16.dp))
+            PortraitArt(AvatarArt.GIRL, Art3D.Stopwatch, propOnLeft = true)
+            FloatingNote(Icons.Rounded.HourglassBottom, Gradients.Sky, "Экранное время", "1 ч 35 мин из 2 ч", Modifier.align(Alignment.BottomCenter).padding(16.dp))
         }
         else -> {
             BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -199,12 +201,19 @@ private fun BoxScope.FamilyArt() {
     }
 }
 
-/** A figure standing on the bottom edge of the panel. */
+/** A large family portrait on soft halos with a 3D object beside it. */
 @Composable
-private fun BoxScope.PersonArt(res: Int, cropBottom: Float) {
-    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-        val height = minOf(maxHeight * 0.94f, maxWidth * 1.05f)
-        CroppedIllustration(res, width = height / (1f - cropBottom), cropBottom = cropBottom)
+private fun BoxScope.PortraitArt(portrait: AvatarArt, @DrawableRes prop: Int, propOnLeft: Boolean) {
+    BoxWithConstraints(Modifier.fillMaxSize().padding(bottom = 40.dp), contentAlignment = Alignment.Center) {
+        val s = minOf(maxWidth, maxHeight)
+        Box(Modifier.size(s * 0.86f).clip(CircleShape).background(Color.White.copy(alpha = 0.45f)))
+        Box(Modifier.size(s * 0.66f).clip(CircleShape).background(Color.White.copy(alpha = 0.6f)))
+        AvatarImage(portrait.value, size = s * 0.56f, ring = Color.White)
+        Illustration(
+            prop,
+            Modifier.offset(x = if (propOnLeft) -s * 0.3f else s * 0.3f, y = -s * 0.24f),
+            size = s * 0.3f,
+        )
     }
 }
 
@@ -239,10 +248,10 @@ private fun RoleChoice(onChoose: (MemberRole?) -> Unit) {
             Illustration(R.drawable.ill_mark_shield, Modifier.align(Alignment.Center).padding(top = 8.dp), size = 92.dp)
         }
         RoleCard(MemberRole.ELDER, "Телефон пожилого родственника", "Защита от мошенников, крупные кнопки, SOS и напоминания", { onChoose(MemberRole.ELDER) }) {
-            CroppedIllustration(R.drawable.ill_role_elder, width = 150.dp, cropBottom = 0.13f, modifier = Modifier.align(Alignment.BottomCenter))
+            PortraitPair(AvatarArt.GRANDMA, AvatarArt.GRANDPA)
         }
         RoleCard(MemberRole.CHILD, "Телефон ребёнка или подростка", "Экранное время, безопасный интернет, геолокация и SOS", { onChoose(MemberRole.CHILD) }) {
-            CroppedIllustration(R.drawable.ill_role_child, width = 150.dp, cropBottom = 0.08f, modifier = Modifier.align(Alignment.BottomCenter))
+            PortraitPair(AvatarArt.GIRL, AvatarArt.BOY)
         }
         Row(
             Modifier.fillMaxWidth()
@@ -293,3 +302,10 @@ private fun RoleCard(role: MemberRole, title: String, text: String, onClick: () 
 }
 
 private val RoleArtWidth: Dp = 122.dp
+
+/** Two overlapping portraits standing in a role card's mint arch. */
+@Composable
+private fun BoxScope.PortraitPair(back: AvatarArt, front: AvatarArt) {
+    AvatarImage(back.value, size = 62.dp, ring = Color.White, modifier = Modifier.align(Alignment.Center).offset(x = 22.dp, y = (-26).dp))
+    AvatarImage(front.value, size = 70.dp, ring = Color.White, modifier = Modifier.align(Alignment.Center).offset(x = (-14).dp, y = 24.dp))
+}

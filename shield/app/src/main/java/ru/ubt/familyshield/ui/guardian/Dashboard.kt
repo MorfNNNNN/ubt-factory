@@ -3,6 +3,8 @@ package ru.ubt.familyshield.ui.guardian
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -60,6 +62,7 @@ import ru.ubt.familyshield.shared.model.MemberRole
 import ru.ubt.familyshield.shared.policy.formatMinutes
 import ru.ubt.familyshield.ui.FamilyUiState
 import ru.ubt.familyshield.ui.ShieldViewModel
+import ru.ubt.familyshield.ui.components.AvatarArt
 import ru.ubt.familyshield.ui.components.AvatarImage
 import ru.ubt.familyshield.ui.components.AvatarStack
 import ru.ubt.familyshield.ui.components.FeatureIcons
@@ -360,9 +363,15 @@ private fun AddPhoneCard(title: String, subtitle: String, onClick: () -> Unit) {
 @Composable
 private fun RolePromo(onAdd: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        listOf(R.drawable.ill_role_child to "Ребёнок или подросток", R.drawable.ill_role_elder to "Пожилой родитель").forEach { (art, label) ->
+        listOf(
+            Triple(AvatarArt.GIRL, AvatarArt.BOY, "Ребёнок или подросток"),
+            Triple(AvatarArt.GRANDMA, AvatarArt.GRANDPA, "Пожилой родитель"),
+        ).forEach { (back, front, label) ->
             SoftCard(Modifier.weight(1f), onClick = onAdd, padding = 14.dp) {
-                Illustration(art, Modifier.fillMaxWidth().height(120.dp).clip(MaterialTheme.shapes.medium))
+                Box(Modifier.fillMaxWidth().height(120.dp).clip(MaterialTheme.shapes.medium).background(Gradients.Mint), contentAlignment = Alignment.Center) {
+                    AvatarImage(back.value, size = 64.dp, ring = Color.White, modifier = Modifier.offset(x = 20.dp, y = (-10).dp))
+                    AvatarImage(front.value, size = 72.dp, ring = Color.White, modifier = Modifier.offset(x = (-18).dp, y = 14.dp))
+                }
                 Text(label, style = MaterialTheme.typography.titleSmall)
             }
         }

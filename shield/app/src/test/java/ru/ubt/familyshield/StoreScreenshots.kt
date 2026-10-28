@@ -325,6 +325,8 @@ class StoreScreenshots {
         Screen("27-roles", MemberRole.GUARDIAN, tab("Пропустить")) { _, _ -> OnboardingFlow(graph, null) {} },
         Screen("28-create-family", MemberRole.GUARDIAN) { _, _ -> GuardianSetup(graph, {}, {}) },
         Screen("29-join", MemberRole.CHILD) { _, _ -> JoinFamily(graph, null, {}) {} },
+        Screen("30-welcome-2", MemberRole.GUARDIAN, tab("Далее")) { _, _ -> OnboardingFlow(graph, null) {} },
+        Screen("31-welcome-3", MemberRole.GUARDIAN, { tab("Далее")(); tab("Далее")() }) { _, _ -> OnboardingFlow(graph, null) {} },
     )
 
     /** One process, one DataStore: every screen is drawn in turn into the same window. */
