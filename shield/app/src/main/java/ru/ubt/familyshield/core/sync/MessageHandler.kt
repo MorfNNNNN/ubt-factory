@@ -2,6 +2,7 @@ package ru.ubt.familyshield.core.sync
 
 import android.util.Log
 import ru.ubt.familyshield.core.db.AlertEntity
+import ru.ubt.familyshield.core.db.ChangeEntity
 import ru.ubt.familyshield.core.db.LocationEntity
 import ru.ubt.familyshield.core.db.MemberEntity
 import ru.ubt.familyshield.core.db.NoteEntity
@@ -10,6 +11,8 @@ import ru.ubt.familyshield.core.db.ShieldDatabase
 import ru.ubt.familyshield.core.db.UsageEntity
 import ru.ubt.familyshield.core.family.FamilyRepository
 import ru.ubt.familyshield.core.family.MessageSender
+import ru.ubt.familyshield.core.family.childPolicy
+import ru.ubt.familyshield.core.family.elderPolicy
 import ru.ubt.familyshield.core.family.send
 import ru.ubt.familyshield.core.notify.Notifier
 import ru.ubt.familyshield.core.prefs.SettingsStore
@@ -26,11 +29,12 @@ import ru.ubt.familyshield.shared.model.FamilyNote
 import ru.ubt.familyshield.shared.model.MemberRole
 import ru.ubt.familyshield.shared.model.RequestDecision
 import ru.ubt.familyshield.shared.model.RequestKind
+import ru.ubt.familyshield.shared.policy.PolicyDiff
 import ru.ubt.familyshield.shared.protocol.Audience
 import ru.ubt.familyshield.shared.protocol.FamilyPayload
 import ru.ubt.familyshield.shared.model.TaskState
-import ru.ubt.familyshield.core.family.toEntity
 import ru.ubt.familyshield.core.family.task
+import ru.ubt.familyshield.core.family.toEntity
 import ru.ubt.familyshield.shared.protocol.InnerMessage
 
 /** What a protected device does when its guardians change something. Implemented by the protection layer. */
@@ -131,20 +135,28 @@ class MessageHandler(
                 it.copy(learningJson = ShieldJson.encodeToString(ru.ubt.familyshield.shared.model.SafetyProgress.serializer(), payload.progress))
             }
             is FamilyPayload.ChildPolicyUpdate -> if (payload.targetDeviceId == me) {
-                if (payload.policy.version >= settings.current.childPolicy.version) {
+                val before = settings.current.childPolicy
+                if (payload.policy.version >= before.version) {
                     settings.setChildPolicy(payload.policy)
                     controller().applyChildPolicy(payload.policy)
+                    logChanges(payload.targetDeviceId, senderDeviceId, PolicyDiff.child(before, payload.policy))
                 }
             } else if (isGuardian) {
+                val before = db.members().get(payload.targetDeviceId)?.childPolicy()
                 updateMember(payload.targetDeviceId) { it.copy(policyJson = ShieldJson.encodeToString(ChildPolicy.serializer(), payload.policy)) }
+                if (before != null) logChanges(payload.targetDeviceId, senderDeviceId, PolicyDiff.child(before, payload.policy))
             }
             is FamilyPayload.ElderPolicyUpdate -> if (payload.targetDeviceId == me) {
-                if (payload.policy.version >= settings.current.elderPolicy.version) {
+                val before = settings.current.elderPolicy
+                if (payload.policy.version >= before.version) {
                     settings.setElderPolicy(payload.policy)
                     controller().applyElderPolicy(payload.policy)
+                    logChanges(payload.targetDeviceId, senderDeviceId, PolicyDiff.elder(before, payload.policy))
                 }
             } else if (isGuardian) {
+                val before = db.members().get(payload.targetDeviceId)?.elderPolicy()
                 updateMember(payload.targetDeviceId) { it.copy(policyJson = ShieldJson.encodeToString(ElderPolicy.serializer(), payload.policy)) }
+                if (before != null) logChanges(payload.targetDeviceId, senderDeviceId, PolicyDiff.elder(before, payload.policy))
             }
             is FamilyPayload.CommandIssued -> if (payload.targetDeviceId == me) controller().execute(payload.command)
             is FamilyPayload.Decision -> if (payload.targetDeviceId == me) {
@@ -163,6 +175,12 @@ class MessageHandler(
         // Self-announced keys are judged in onGuardianKey against the server's member list.
         payload is FamilyPayload.GuardianKey && auth == SenderAuth.SELF_ANNOUNCED && isGuardian -> true
         else -> false
+    }
+
+    private suspend fun logChanges(memberId: String, actor: String, lines: List<String>) {
+        if (lines.isEmpty()) return
+        val now = clock()
+        db.changes().insertAll(lines.map { ChangeEntity(memberDeviceId = memberId, actorDeviceId = actor, text = it, createdAt = now) })
     }
 
     private suspend fun updateMember(deviceId: String, block: (MemberEntity) -> MemberEntity) {

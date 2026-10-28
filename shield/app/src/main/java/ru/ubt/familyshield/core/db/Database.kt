@@ -348,10 +348,36 @@ interface TaskDao {
     suspend fun clear()
 }
 
+/** «Журнал изменений»: one line per change of a member's rules, shown to the whole family. */
+@Entity(tableName = "changes", indices = [Index("memberDeviceId")])
+data class ChangeEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val memberDeviceId: String,
+    val actorDeviceId: String,
+    val text: String,
+    val createdAt: Long,
+)
+
+@Dao
+interface ChangeDao {
+    @Query("SELECT * FROM changes WHERE memberDeviceId = :deviceId ORDER BY createdAt DESC, id DESC LIMIT :limit")
+    fun observeFor(deviceId: String, limit: Int = 200): Flow<List<ChangeEntity>>
+
+    @Insert
+    suspend fun insertAll(changes: List<ChangeEntity>)
+
+    @Query("DELETE FROM changes WHERE createdAt < :before")
+    suspend fun deleteOlderThan(before: Long)
+
+    @Query("DELETE FROM changes")
+    suspend fun clear()
+}
+
 @Database(
     entities = [
         MemberEntity::class, AlertEntity::class, LocationEntity::class, UsageEntity::class, RequestEntity::class,
         NoteEntity::class, OutboxEntity::class, EventEntity::class, ThreatNumberEntity::class, TaskEntity::class,
+        ChangeEntity::class,
     ],
     version = 2,
     exportSchema = true,
@@ -368,6 +394,7 @@ abstract class ShieldDatabase : RoomDatabase() {
     abstract fun events(): EventDao
     abstract fun threatNumbers(): ThreatNumberDao
     abstract fun tasks(): TaskDao
+    abstract fun changes(): ChangeDao
 
     suspend fun clearFamilyData() {
         members().clear()
@@ -378,6 +405,7 @@ abstract class ShieldDatabase : RoomDatabase() {
         notes().clear()
         outbox().clear()
         tasks().clear()
+        changes().clear()
     }
 
     companion object {

@@ -90,7 +90,7 @@ fun GuardianRoot(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState) {
         // Consume the bars here so nested screens (and their own scaffolds) don't pad for them twice.
         Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
             when (tab) {
-                Tab.FAMILY -> GuardianDashboard(graph, vm, state, onOpenMember = { openMember = it }, onGoAlerts = { tab = Tab.ALERTS })
+                Tab.FAMILY -> GuardianDashboard(graph, vm, state, onOpenMember = { openMember = it }, onGoAlerts = { tab = Tab.ALERTS }, onOpenSettings = { tab = Tab.SETTINGS })
                 Tab.ALERTS -> AlertsScreen(graph, vm, state, onOpenMember = { openMember = it })
                 Tab.CHAT -> FamilyChatScreen(graph, state, embedded = true)
                 Tab.SETTINGS -> GuardianSettings(graph, vm, state)

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 2,
-    "identityHash": "887fa7039ffe0a62b612f702f78c31c6",
+    "identityHash": "2cc9a0998b261196e663e34098b97f1c",
     "entities": [
       {
         "tableName": "members",
@@ -717,11 +717,64 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_tasks_assigneeDeviceId` ON `${TABLE_NAME}` (`assigneeDeviceId`)"
           }
         ]
+      },
+      {
+        "tableName": "changes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `memberDeviceId` TEXT NOT NULL, `actorDeviceId` TEXT NOT NULL, `text` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "memberDeviceId",
+            "columnName": "memberDeviceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actorDeviceId",
+            "columnName": "actorDeviceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_changes_memberDeviceId",
+            "unique": false,
+            "columnNames": [
+              "memberDeviceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_changes_memberDeviceId` ON `${TABLE_NAME}` (`memberDeviceId`)"
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '887fa7039ffe0a62b612f702f78c31c6')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '2cc9a0998b261196e663e34098b97f1c')"
     ]
   }
 }

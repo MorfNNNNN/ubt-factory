@@ -1,5 +1,6 @@
 package ru.ubt.familyshield.core.family
 
+import ru.ubt.familyshield.core.db.ChangeEntity
 import ru.ubt.familyshield.core.db.MemberEntity
 import ru.ubt.familyshield.core.db.NoteEntity
 import ru.ubt.familyshield.core.db.RequestEntity
@@ -18,6 +19,7 @@ import ru.ubt.familyshield.shared.model.MemberRole
 import ru.ubt.familyshield.shared.model.QuickReply
 import ru.ubt.familyshield.shared.model.RequestDecision
 import ru.ubt.familyshield.shared.model.RequestKind
+import ru.ubt.familyshield.shared.policy.PolicyDiff
 import ru.ubt.familyshield.shared.protocol.Audience
 import ru.ubt.familyshield.shared.protocol.FamilyPayload
 import ru.ubt.familyshield.shared.model.FamilyTask
@@ -53,16 +55,27 @@ class GuardianActions(
 
     suspend fun updateChild(memberId: String, transform: (ChildPolicy) -> ChildPolicy) {
         val member = db.members().get(memberId) ?: return
-        val policy = transform(member.childPolicy()).copy(version = clock())
+        val before = member.childPolicy()
+        val policy = transform(before).copy(version = clock())
         db.members().upsert(member.copy(policyJson = ShieldJson.encodeToString(ChildPolicy.serializer(), policy)))
+        logChanges(memberId, PolicyDiff.child(before, policy))
         sender().send(FamilyPayload.ChildPolicyUpdate(memberId, policy), Audience.DEVICES, recipients(memberId), urgent = true)
     }
 
     suspend fun updateElder(memberId: String, transform: (ElderPolicy) -> ElderPolicy) {
         val member = db.members().get(memberId) ?: return
-        val policy = transform(member.elderPolicy()).copy(version = clock())
+        val before = member.elderPolicy()
+        val policy = transform(before).copy(version = clock())
         db.members().upsert(member.copy(policyJson = ShieldJson.encodeToString(ElderPolicy.serializer(), policy)))
+        logChanges(memberId, PolicyDiff.elder(before, policy))
         sender().send(FamilyPayload.ElderPolicyUpdate(memberId, policy), Audience.DEVICES, recipients(memberId), urgent = true)
+    }
+
+    private suspend fun logChanges(memberId: String, lines: List<String>) {
+        if (lines.isEmpty()) return
+        val now = clock()
+        val me = settings.current.deviceId.orEmpty()
+        db.changes().insertAll(lines.map { ChangeEntity(memberDeviceId = memberId, actorDeviceId = me, text = it, createdAt = now) })
     }
 
     suspend fun command(memberId: String, command: Command) =

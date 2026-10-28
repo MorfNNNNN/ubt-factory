@@ -104,15 +104,19 @@ private sealed interface SchoolPage {
     data class Quiz(val id: String) : SchoolPage
 }
 
+/** [initialLesson] opens one lesson directly (from an event or a seasonal banner); back then leaves the school. */
 @Composable
-fun SafetySchoolScreen(graph: AppGraph, onBack: () -> Unit) {
+fun SafetySchoolScreen(graph: AppGraph, initialLesson: String? = null, onBack: () -> Unit) {
     val settings by graph.settings.state.collectAsState()
     val lessons = remember(settings.role) { lessonsFor(settings.role) }
-    var page by remember { mutableStateOf<SchoolPage>(SchoolPage.List) }
+    var page by remember { mutableStateOf<SchoolPage>(initialLesson?.let { SchoolPage.Lesson(it) } ?: SchoolPage.List) }
     when (val p = page) {
         SchoolPage.List -> SchoolList(lessons, settings.learning, onBack) { page = SchoolPage.Lesson(it) }
         is SchoolPage.Lesson -> SafetySchool.byId(p.id)?.let { lesson ->
-            LessonScreen(lesson, settings.learning.lessons[lesson.id], onBack = { page = SchoolPage.List }) { page = SchoolPage.Quiz(lesson.id) }
+            LessonScreen(
+                lesson, settings.learning.lessons[lesson.id],
+                onBack = { if (p.id == initialLesson) onBack() else page = SchoolPage.List },
+            ) { page = SchoolPage.Quiz(lesson.id) }
         }
         is SchoolPage.Quiz -> SafetySchool.byId(p.id)?.let { lesson ->
             QuizScreen(graph, lesson, onBack = { page = SchoolPage.Lesson(lesson.id) }, onDone = { page = SchoolPage.List })

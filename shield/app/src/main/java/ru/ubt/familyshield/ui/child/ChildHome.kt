@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AllInclusive
 import androidx.compose.material.icons.rounded.Celebration
 import androidx.compose.material.icons.rounded.GppMaybe
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.HourglassBottom
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Lock
@@ -74,6 +75,8 @@ import ru.ubt.familyshield.ui.components.LabelChip
 import ru.ubt.familyshield.ui.components.NoticeCard
 import ru.ubt.familyshield.ui.components.ProgressRing
 import ru.ubt.familyshield.ui.components.SoftCard
+import ru.ubt.familyshield.ui.components.TileRow
+import ru.ubt.familyshield.ui.guardian.ChangeLogScreen
 import ru.ubt.familyshield.ui.components.SosPulse
 import ru.ubt.familyshield.ui.safety.SafetySchoolScreen
 import ru.ubt.familyshield.ui.setup.PermissionWizard
@@ -82,7 +85,7 @@ import ru.ubt.familyshield.ui.tasks.ChildTasksScreen
 import ru.ubt.familyshield.ui.theme.Brand
 import ru.ubt.familyshield.ui.theme.Gradients
 
-private enum class ChildPage { HOME, TASKS, SCHOOL }
+private enum class ChildPage { HOME, TASKS, SCHOOL, CHANGES }
 
 /** The child's own screen: honest, friendly, shows their time left and lets them reach parents and SOS. */
 @Composable
@@ -95,6 +98,7 @@ fun ChildHome(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState) {
     when (page) {
         ChildPage.TASKS -> { ChildTasksScreen(graph) { page = ChildPage.HOME }; return }
         ChildPage.SCHOOL -> { SafetySchoolScreen(graph) { page = ChildPage.HOME }; return }
+        ChildPage.CHANGES -> { ChangeLogScreen(graph, state.settings.deviceId.orEmpty(), "Что меняли родители", state.members) { page = ChildPage.HOME }; return }
         ChildPage.HOME -> Unit
     }
 
@@ -182,6 +186,7 @@ fun ChildHome(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState) {
                 "Твою личную переписку родители не читают.", Icons.Rounded.Lock, Gradients.Slate, tile = 30.dp,
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
             )
+            TileRow("Что меняли родители", subtitle = "Все изменения правил видны тебе", icon = Icons.Rounded.History, gradient = Gradients.Slate) { page = ChildPage.CHANGES }
         }
     }
 }

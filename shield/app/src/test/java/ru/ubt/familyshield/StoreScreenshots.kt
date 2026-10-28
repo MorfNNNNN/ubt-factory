@@ -31,6 +31,7 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowSettings
 import ru.ubt.familyshield.core.db.AlertEntity
+import ru.ubt.familyshield.core.db.ChangeEntity
 import ru.ubt.familyshield.core.db.LocationEntity
 import ru.ubt.familyshield.core.family.toEntity
 import ru.ubt.familyshield.core.db.MemberEntity
@@ -75,9 +76,15 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import ru.ubt.familyshield.ui.FamilyUiState
 import ru.ubt.familyshield.ui.elder.ElderSettings
 import ru.ubt.familyshield.ui.guardian.AppsScreen
+import ru.ubt.familyshield.ui.guardian.ChangeLogScreen
 import ru.ubt.familyshield.ui.guardian.ElderControls
 import ru.ubt.familyshield.ui.guardian.MemberDetailScreen
 import ru.ubt.familyshield.ui.guardian.SecurityScreen
@@ -236,6 +243,12 @@ class StoreScreenshots {
                 "Веб-фильтр не пустил на сайт онлайн-казино.", createdAt = now - 3 * 60 * min, read = true,
             ),
         )
+        (1..5).forEach { d ->
+            db.alerts().insert(AlertEntity("ok$d", "mama", "CHECK_IN_OK", "INFO", "Мама: «Я в порядке»", "Отметка получена", createdAt = now - d * 24 * 60 * min + 30 * min, read = true))
+        }
+        (1..4).forEach { d ->
+            db.alerts().insert(AlertEntity("td$d", "masha", "TASK_DONE", "INFO", "Маша: задание выполнено", "«Сделать уроки»", createdAt = now - d * 24 * 60 * min + 90 * min, read = true))
+        }
         val more = MemberRequest("r1", RequestKind.MORE_TIME, now - 7 * min, minutes = 30, reason = "Доделать проект по биологии")
         db.requests().upsert(RequestEntity("r1", "masha", "MORE_TIME", ShieldJson.encodeToString(MemberRequest.serializer(), more), more.createdAt))
         val app = MemberRequest("r2", RequestKind.APP_APPROVAL, now - 25 * min, packageName = "com.duolingo", appLabel = "Duolingo")
@@ -258,6 +271,15 @@ class StoreScreenshots {
             Triple(now - 120 * min, "Школа № 57", GeoPoint(55.7539, 37.6208)),
             Triple(now - 6 * min, "Школа № 57", GeoPoint(55.7539, 37.6208)),
         ).forEach { (t, place, p) -> db.locations().insert(LocationEntity(deviceId = "masha", lat = p.lat, lon = p.lon, accuracy = 20f, time = t, address = place)) }
+        db.changes().insertAll(
+            listOf(
+                ChangeEntity(memberDeviceId = "masha", actorDeviceId = "anna", text = "Лимит в будни: 3 ч → 2 ч 30 мин", createdAt = now - 26 * 60 * min),
+                ChangeEntity(memberDeviceId = "masha", actorDeviceId = "anna", text = "Добавлено расписание «Уроки» 15:00–18:00", createdAt = now - 26 * 60 * min),
+                ChangeEntity(memberDeviceId = "masha", actorDeviceId = "anna", text = "Добавлена геозона «Бассейн «Дельфин»»", createdAt = now - 26 * 60 * min),
+                ChangeEntity(memberDeviceId = "masha", actorDeviceId = "anna", text = "Подарено +15 мин — Задание: Погулять с собакой", createdAt = now - 120 * min),
+                ChangeEntity(memberDeviceId = "masha", actorDeviceId = "anna", text = "Разрешено новых приложений: 1", createdAt = now - 25 * min),
+            ),
+        )
         db.notes().insert(NoteEntity("n1", "mama", "Я дома, всё хорошо", createdAt = now - 90 * min, mine = false))
         db.notes().insert(NoteEntity("n2", "anna", "Отлично! Вечером заеду", createdAt = now - 85 * min, mine = true))
     }
@@ -327,7 +349,22 @@ class StoreScreenshots {
         Screen("29-join", MemberRole.CHILD) { _, _ -> JoinFamily(graph, null, {}) {} },
         Screen("30-welcome-2", MemberRole.GUARDIAN, tab("Далее")) { _, _ -> OnboardingFlow(graph, null) {} },
         Screen("31-welcome-3", MemberRole.GUARDIAN, { tab("Далее")(); tab("Далее")() }) { _, _ -> OnboardingFlow(graph, null) {} },
+        Screen("32-changes", MemberRole.GUARDIAN) { _, state -> ChangeLogScreen(graph, "masha", "Журнал: Маша", state.members) {} },
+        Screen("33-family-more", MemberRole.GUARDIAN, {
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText("Настройте защиту семьи"))
+            compose.mainClock.advanceTimeBy(1_000)
+        }) { vm, state -> GuardianRoot(graph, vm, state) },
+        Screen("34-family-bottom", MemberRole.GUARDIAN, scroll(9)) { vm, state -> GuardianRoot(graph, vm, state) },
+        Screen("35-alerts-advice", MemberRole.GUARDIAN, { tab("События")(); scroll(1)() }) { vm, state -> GuardianRoot(graph, vm, state) },
     )
+
+    private fun scroll(times: Int): () -> Unit = {
+        repeat(times) {
+            compose.onRoot().performTouchInput { swipeUp(startY = bottom * 0.8f, endY = bottom * 0.35f, durationMillis = 300) }
+            compose.mainClock.advanceTimeBy(600)
+        }
+        compose.mainClock.advanceTimeBy(1_000)
+    }
 
     /** One process, one DataStore: every screen is drawn in turn into the same window. */
     @Test

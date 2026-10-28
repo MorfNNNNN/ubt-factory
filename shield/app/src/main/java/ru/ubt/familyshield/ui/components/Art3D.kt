@@ -32,6 +32,7 @@ object Art3D {
     val CreditCard = R.drawable.ic3d_credit_card
     val Coin = R.drawable.ic3d_coin
     val Bell = R.drawable.ic3d_bell
+    val BellFestive = R.drawable.ic3d_bell_festive
     val NotifyHeart = R.drawable.ic3d_notify_heart
     val Calendar = R.drawable.ic3d_calendar
     val Clock = R.drawable.ic3d_clock
@@ -61,6 +62,7 @@ object Art3D {
     val Moon = R.drawable.ic3d_moon
     val Sun = R.drawable.ic3d_sun
     val Umbrella = R.drawable.ic3d_umbrella
+    val Travel = R.drawable.ic3d_travel
 }
 
 /** A 3D object on a soft rounded backdrop, for list rows and cards. */

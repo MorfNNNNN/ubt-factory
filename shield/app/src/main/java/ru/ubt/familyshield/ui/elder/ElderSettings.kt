@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.FamilyRestroom
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.HourglassTop
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.PowerSettingsNew
@@ -51,6 +52,7 @@ import ru.ubt.familyshield.ui.components.ScreenScaffold
 import ru.ubt.familyshield.ui.components.SectionHeader
 import ru.ubt.familyshield.ui.components.SoftCard
 import ru.ubt.familyshield.ui.components.TileRow
+import ru.ubt.familyshield.ui.guardian.ChangeLogScreen
 import ru.ubt.familyshield.ui.theme.Brand
 import ru.ubt.familyshield.ui.theme.Gradients
 
@@ -58,7 +60,9 @@ import ru.ubt.familyshield.ui.theme.Gradients
 fun ElderSettings(graph: AppGraph, state: FamilyUiState, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var confirmOff by remember { mutableStateOf(false) }
+    var changes by remember { mutableStateOf(false) }
     val s = state.settings
+    if (changes) { ChangeLogScreen(graph, s.deviceId.orEmpty(), "Что меняли близкие", state.members) { changes = false }; return }
 
     ScreenScaffold(title = "Настройки", onBack = onBack) { padding ->
         Column(Modifier.padding(padding).padding(horizontal = 16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -116,6 +120,7 @@ fun ElderSettings(graph: AppGraph, state: FamilyUiState, onBack: () -> Unit) {
                 GlyphLine("Близкие помогают защитить вас от мошенников", Icons.Rounded.FamilyRestroom, Gradients.Emerald, tile = 38.dp)
                 GlyphLine("Они видят предупреждения об опасности", Icons.Rounded.Visibility, Gradients.Sky, tile = 38.dp)
                 GlyphLine("Но не читают вашу переписку", Icons.Rounded.VisibilityOff, Gradients.Slate, tile = 38.dp)
+                TileRow("Что меняли близкие", subtitle = "Все изменения защиты видны вам", icon = Icons.Rounded.History, gradient = Gradients.Slate) { changes = true }
             }
 
             SoftCard(onClick = { confirmOff = true }, padding = 14.dp) {

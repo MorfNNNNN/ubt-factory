@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -66,6 +67,13 @@ class FamilyFeaturesTest {
         assertTrue(sent.any { it is FamilyPayload.TaskReview && it.approved })
         val bonus = db.members().get("kid")!!.childPolicy().bonuses.single()
         assertEquals(20, bonus.minutes)
+    }
+
+    @Test
+    fun policyChangesAreJournaled() = runBlocking {
+        GuardianActions(settings, db, { sender }).updateChild("kid") { it.copy(dailyLimitWeekdayMinutes = 60) }
+        val lines = db.changes().observeFor("kid").first().map { it.text }
+        assertTrue(lines.toString(), lines.any { it.startsWith("Лимит в будни") && it.endsWith("1 ч") })
     }
 
     @Test

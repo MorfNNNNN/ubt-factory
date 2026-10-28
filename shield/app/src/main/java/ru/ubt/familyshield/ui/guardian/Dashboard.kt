@@ -57,6 +57,9 @@ import ru.ubt.familyshield.core.db.AlertEntity
 import ru.ubt.familyshield.core.db.MemberEntity
 import ru.ubt.familyshield.core.family.memberRole
 import ru.ubt.familyshield.shared.model.AlertSeverity
+import ru.ubt.familyshield.shared.content.Campaign
+import ru.ubt.familyshield.shared.content.CampaignAction
+import ru.ubt.familyshield.shared.content.Campaigns
 import ru.ubt.familyshield.shared.model.AlertType
 import ru.ubt.familyshield.shared.model.MemberRole
 import ru.ubt.familyshield.shared.policy.formatMinutes
@@ -79,6 +82,8 @@ import ru.ubt.familyshield.ui.components.gradient
 import ru.ubt.familyshield.ui.components.relativeTime
 import ru.ubt.familyshield.ui.components.visual
 import ru.ubt.familyshield.ui.invite.InviteScreen
+import ru.ubt.familyshield.ui.safety.GosProtectionsScreen
+import ru.ubt.familyshield.ui.safety.SafetySchoolScreen
 import ru.ubt.familyshield.ui.paywall.PaywallScreen
 import ru.ubt.familyshield.ui.paywall.UpsellReason
 import ru.ubt.familyshield.ui.theme.Brand
@@ -88,14 +93,41 @@ private val URGENT = setOf("CRITICAL", "HIGH")
 private const val WEEK_MILLIS = 7 * 86_400_000L
 
 @Composable
-fun GuardianDashboard(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState, onOpenMember: (String) -> Unit, onGoAlerts: () -> Unit) {
+fun GuardianDashboard(
+    graph: AppGraph,
+    vm: ShieldViewModel,
+    state: FamilyUiState,
+    onOpenMember: (String) -> Unit,
+    onGoAlerts: () -> Unit,
+    onOpenSettings: () -> Unit = {},
+) {
     var showInvite by remember { mutableStateOf(false) }
     var paywall by remember { mutableStateOf<UpsellReason?>(null) }
+    var school by remember { mutableStateOf<String?>(null) }
+    var gos by remember { mutableStateOf(false) }
 
     paywall?.let { PaywallScreen(graph, it) { paywall = null }; return }
     if (showInvite) {
         InviteScreen(graph, state) { showInvite = false }
         return
+    }
+    school?.let { SafetySchoolScreen(graph, it.ifBlank { null }) { school = null }; return }
+    if (gos) { GosProtectionsScreen(graph) { gos = false }; return }
+
+    fun firstOf(role: MemberRole) = state.others.firstOrNull { it.memberRole == role }?.deviceId
+    fun onCampaign(c: Campaign) = when (c.action) {
+        CampaignAction.LESSON -> school = c.lessonId.orEmpty()
+        CampaignAction.GOS -> gos = true
+        CampaignAction.INVITE -> showInvite = true
+        CampaignAction.PREMIUM -> paywall = UpsellReason.ELDER
+        CampaignAction.CHILD_RULES -> firstOf(MemberRole.CHILD)?.let(onOpenMember) ?: run { showInvite = true }
+    }
+    fun onStep(step: SetupStep) = when (step) {
+        SetupStep.ELDER, SetupStep.CHILD -> showInvite = true
+        SetupStep.PHONE -> onOpenSettings()
+        SetupStep.HOME_ZONE -> (firstOf(MemberRole.CHILD) ?: firstOf(MemberRole.ELDER))?.let(onOpenMember) ?: run { showInvite = true }
+        SetupStep.LESSON -> school = ""
+        SetupStep.CREDIT_BAN -> gos = true
     }
 
     val urgent = state.alerts.filter { !it.read && it.severity in URGENT }
@@ -120,6 +152,11 @@ fun GuardianDashboard(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState
 
         if (state.pendingRequests.isNotEmpty()) RequestsCard(state, onGoAlerts)
 
+        Campaigns.active()?.let { CampaignCard(it, ::onCampaign) }
+
+        val setup = setupProgress(state)
+        if (setup.values.any { !it }) SetupChecklist(setup, ::onStep)
+
         if (state.others.isEmpty()) {
             RolePromo { showInvite = true }
         } else {
@@ -128,6 +165,7 @@ fun GuardianDashboard(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState
                 MemberCard(state, member) { onOpenMember(member.deviceId) }
             }
             AddPhoneCard("Добавить ещё телефон", "Ребёнка, родителя или второго взрослого") { showInvite = true }
+            WeekCard(state)
         }
 
         if (graph.entitlements.tier == ru.ubt.familyshield.shared.billing.Tier.FREE) {

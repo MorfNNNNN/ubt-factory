@@ -16,6 +16,7 @@ import androidx.compose.material.icons.rounded.Battery2Bar
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.GppGood
 import androidx.compose.material.icons.rounded.GppMaybe
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.HourglassBottom
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.MoreTime
@@ -79,7 +80,7 @@ import ru.ubt.familyshield.ui.theme.Brand
 import ru.ubt.familyshield.ui.theme.Gradients
 import java.util.UUID
 
-private enum class Detail { OVERVIEW, CONTROLS, LOCATION, APPS, SECURITY, TASKS, SAFETY }
+private enum class Detail { OVERVIEW, CONTROLS, LOCATION, APPS, SECURITY, TASKS, SAFETY, CHANGES }
 
 @Composable
 fun MemberDetailScreen(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState, member: MemberEntity, onBack: () -> Unit) {
@@ -96,6 +97,7 @@ fun MemberDetailScreen(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiStat
         Detail.SECURITY -> SecurityScreen(graph, member) { screen = Detail.OVERVIEW }
         Detail.TASKS -> GuardianTasksScreen(graph, member) { screen = Detail.OVERVIEW }
         Detail.SAFETY -> MemberSafetyScreen(member) { screen = Detail.OVERVIEW }
+        Detail.CHANGES -> ChangeLogScreen(graph, member.deviceId, "Журнал: ${member.displayName}", state.members) { screen = Detail.OVERVIEW }
     }
 }
 
@@ -165,6 +167,7 @@ private fun Overview(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState,
                         subtitle = score?.let { "Оценка защищённости: $it/100" } ?: "Проверка угроз и настроек",
                         icon = Icons.Rounded.Security, gradient = Gradients.Sunrise,
                     ) { open(Detail.SECURITY) }
+                    TileRow("Журнал изменений", subtitle = "Кто и когда менял правила", icon = Icons.Rounded.History, gradient = Gradients.Slate) { open(Detail.CHANGES) }
                 }
             }
 
