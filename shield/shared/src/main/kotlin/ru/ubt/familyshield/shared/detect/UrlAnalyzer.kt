@@ -100,7 +100,7 @@ object UrlAnalyzer {
     private val tlds = "ru|рф|su|com|net|org|info|online|site|top|xyz|club|shop|store|me|io|pro|biz|cc|ly|gl|gy|at|li|link|click|live|app|dev|icu|buzz|space|website|fun|life|world|tk|ml|ga|cf|gq|ws|to|pw|cfd|sbs|bond|win|lol|by|kz|ua|uz"
 
     private val urlRegex = Regex(
-        "(?i)(?:(?:https?|hxxps?)://|www\\.)[^\\s<>\"'«»]+|\\b(?:[a-z0-9\\u0430-\\u044f\\u0451-]+\\.)+(?:$tlds)(?:/[^\\s<>\"'«»]*)?(?![\\p{L}\\p{N}])",
+        "(?i)(?:(?:https?|hxxps?)://|www\\.)[^\\s<>\"'«»]+|(?<![\\p{L}\\p{N}.-])(?:[a-z0-9\\u0430-\\u044f\\u0451-]+\\.)+(?:$tlds)(?:/[^\\s<>\"'«»]*)?(?![\\p{L}\\p{N}])",
     )
 
     fun extract(text: String): List<String> =

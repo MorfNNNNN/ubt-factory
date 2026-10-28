@@ -48,6 +48,7 @@ import ru.ubt.familyshield.shared.model.AgeBand
 import ru.ubt.familyshield.shared.model.ChildPolicy
 import ru.ubt.familyshield.shared.model.DeviceStatus
 import ru.ubt.familyshield.shared.model.ElderPolicy
+import ru.ubt.familyshield.shared.model.MedicalCard
 import ru.ubt.familyshield.shared.model.FamilyTask
 import ru.ubt.familyshield.shared.model.GeoPoint
 import ru.ubt.familyshield.shared.model.Geofence
@@ -83,6 +84,8 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import ru.ubt.familyshield.ui.FamilyUiState
 import ru.ubt.familyshield.ui.elder.ElderSettings
+import ru.ubt.familyshield.ui.elder.MedicalCardEditor
+import ru.ubt.familyshield.ui.elder.MedicalCardScreen
 import ru.ubt.familyshield.ui.guardian.AppsScreen
 import ru.ubt.familyshield.ui.guardian.ChangeLogScreen
 import ru.ubt.familyshield.ui.guardian.ElderControls
@@ -167,7 +170,12 @@ class StoreScreenshots {
         steps = setOf("credit_ban", "code_word", "gos_2fa"),
         updatedAt = now - 2 * 60 * min,
     )
+    private val medical = MedicalCard(
+        "II (A) Rh+", "Пенициллин", "Гипертония, диабет 2 типа", "Эналаприл утром, метформин 2 раза в день",
+        "+7 495 123-45-67", "Плохо слышит на левое ухо",
+    )
     private val elderPolicy = ElderPolicy(
+        medical = medical, bigDebitAlert = true,
         trustedContacts = listOf(
             TrustedContact("Анна, дочь", "+7 900 123-45-67", photoEmoji = AvatarArt.MOM.value),
             TrustedContact("Сергей, сын", "+7 900 765-43-21", photoEmoji = AvatarArt.DAD.value),
@@ -249,6 +257,15 @@ class StoreScreenshots {
         (1..4).forEach { d ->
             db.alerts().insert(AlertEntity("td$d", "masha", "TASK_DONE", "INFO", "Маша: задание выполнено", "«Сделать уроки»", createdAt = now - d * 24 * 60 * min + 90 * min, read = true))
         }
+        db.alerts().insert(
+            AlertEntity(
+                "a0", "mama", "BIG_DEBIT", "CRITICAL", "Перевод 45 000 ₽",
+                "С карты ушло 45 000 ₽. Это случилось после разговора с незнакомым номером — позвоните.",
+                sourceAppLabel = "Банк", createdAt = now - 4 * min,
+            ),
+        )
+        val remote = MemberRequest("r3", RequestKind.REMOTE_ACCESS, now - 3 * min, packageName = "com.anydesk.anydeskandroid", appLabel = "AnyDesk")
+        db.requests().upsert(RequestEntity("r3", "mama", "REMOTE_ACCESS", ShieldJson.encodeToString(MemberRequest.serializer(), remote), remote.createdAt))
         val more = MemberRequest("r1", RequestKind.MORE_TIME, now - 7 * min, minutes = 30, reason = "Доделать проект по биологии")
         db.requests().upsert(RequestEntity("r1", "masha", "MORE_TIME", ShieldJson.encodeToString(MemberRequest.serializer(), more), more.createdAt))
         val app = MemberRequest("r2", RequestKind.APP_APPROVAL, now - 25 * min, packageName = "com.duolingo", appLabel = "Duolingo")
@@ -356,6 +373,12 @@ class StoreScreenshots {
         }) { vm, state -> GuardianRoot(graph, vm, state) },
         Screen("34-family-bottom", MemberRole.GUARDIAN, scroll(9)) { vm, state -> GuardianRoot(graph, vm, state) },
         Screen("35-alerts-advice", MemberRole.GUARDIAN, { tab("События")(); scroll(1)() }) { vm, state -> GuardianRoot(graph, vm, state) },
+        Screen("36-medical", MemberRole.ELDER) { _, _ -> MedicalCardScreen("Мама", medical) {} },
+        Screen("37-medical-edit", MemberRole.GUARDIAN) { _, _ -> MedicalCardEditor("Мама", medical, {}) {} },
+        Screen("38-mom-protection-more", MemberRole.GUARDIAN, {
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText("Сообщать о крупных списаниях"))
+            compose.mainClock.advanceTimeBy(1_000)
+        }) { _, state -> ElderControls(graph, state.member("mama")) {} },
     )
 
     private fun scroll(times: Int): () -> Unit = {

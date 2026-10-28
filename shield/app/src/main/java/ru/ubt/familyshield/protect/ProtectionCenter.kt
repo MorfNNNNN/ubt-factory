@@ -161,11 +161,26 @@ class ProtectionCenter(
         for (f in fences) {
             val inside = distanceMeters(p, f.center) <= f.radiusMeters
             val was = geofenceState.put(f.id, inside) ?: continue
+            if (inside && !was && f.name.contains("дом", ignoreCase = true)) sayHome(f.id)
             if (inside && !was && f.notifyOnEnter) {
                 alerts.raise(AlertType.GEOFENCE_ENTER, "Прибыл(а): ${f.name}", "Вошёл в зону «${f.name}»", dedupeKey = "in-${f.id}", cooldownMs = 30 * 60_000L, location = p)
             } else if (!inside && was && f.notifyOnExit) {
                 alerts.raise(AlertType.GEOFENCE_EXIT, "Покинул(а): ${f.name}", "Вышел из зоны «${f.name}»", dedupeKey = "out-${f.id}", cooldownMs = 30 * 60_000L, location = p)
             }
+        }
+    }
+
+    private val homeSaidAt = mutableMapOf<String, Long>()
+
+    /** «Я дома»: on arriving home the phone writes to the family chat by itself (at most every two hours). */
+    private fun sayHome(fenceId: String) {
+        val now = clock()
+        if ((homeSaidAt[fenceId] ?: 0L) > now - 2 * 3_600_000L) return
+        homeSaidAt[fenceId] = now
+        scope.launch {
+            val note = ru.ubt.familyshield.shared.model.FamilyNote(UUID.randomUUID().toString(), "Я дома", now)
+            db.notes().insert(ru.ubt.familyshield.core.db.NoteEntity(note.id, settings.current.deviceId.orEmpty(), note.text, null, now, mine = true))
+            sender().send(ru.ubt.familyshield.shared.protocol.FamilyPayload.Note(note), ru.ubt.familyshield.shared.protocol.Audience.ALL)
         }
     }
 

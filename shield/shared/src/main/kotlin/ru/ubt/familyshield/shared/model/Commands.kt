@@ -52,7 +52,7 @@ sealed class Command {
 }
 
 @Serializable
-enum class RequestKind { MORE_TIME, APP_APPROVAL, SITE_UNBLOCK, PROTECTION_CHANGE }
+enum class RequestKind { MORE_TIME, APP_APPROVAL, SITE_UNBLOCK, PROTECTION_CHANGE, REMOTE_ACCESS }
 
 /** Requests initiated on a protected device (by a child or an elder) that a guardian decides on. */
 @Serializable

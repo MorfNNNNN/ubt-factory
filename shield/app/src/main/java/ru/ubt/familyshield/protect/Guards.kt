@@ -20,6 +20,9 @@ import ru.ubt.familyshield.protect.ui.BlockActivity
 import ru.ubt.familyshield.protect.ui.WarningActivity
 import ru.ubt.familyshield.shared.billing.Feature
 import ru.ubt.familyshield.shared.detect.AppCatalog
+import ru.ubt.familyshield.shared.policy.formatRub
+import ru.ubt.familyshield.shared.detect.BankDebit
+import ru.ubt.familyshield.shared.detect.BankDebitParser
 import ru.ubt.familyshield.shared.detect.CallContext
 import ru.ubt.familyshield.shared.detect.CallRisk
 import ru.ubt.familyshield.shared.detect.CallRiskAnalyzer
@@ -232,14 +235,18 @@ class ElderGuard(
             if (sent) context.startActivity(WarningActivity.intent(context, WarningActivity.Kind.BANK_DURING_CALL, caller))
         }
         val remote = AppCatalog.remoteAccessName(pkg)
-        if (remote != null && policy.remoteAccessGuard && entitlements.has(Feature.REMOTE_ACCESS_GUARD)) {
-            val sent = alerts.raise(
+        val allowedUntil = policy.remoteAccessAllowedUntil
+        if (remote != null && policy.remoteAccessGuard && entitlements.has(Feature.REMOTE_ACCESS_GUARD) &&
+            (allowedUntil == null || allowedUntil < System.currentTimeMillis())
+        ) {
+            alerts.raise(
                 AlertType.REMOTE_ACCESS_APP, "Запущена программа удалённого доступа",
                 "Открыта «$remote». Через неё мошенники управляют телефоном и видят коды." + if (calls.inCall) " Сейчас идёт звонок!" else "",
                 dedupeKey = "remote-$pkg", cooldownMs = 60 * 60_000L, sourceApp = pkg, sourceAppLabel = remote,
                 severity = if (calls.inCall) AlertSeverity.CRITICAL else AlertSeverity.HIGH,
             )
-            if (sent) context.startActivity(WarningActivity.intent(context, WarningActivity.Kind.REMOTE_ACCESS, remote))
+            // «Вторая рука»: the tool stays covered until a guardian approves; the screen offers to ask them.
+            context.startActivity(WarningActivity.intent(context, WarningActivity.Kind.REMOTE_ACCESS, remote, pkg))
         }
         if (calls.inCallWithUnknown && pkg in INSTALLERS && policy.sideloadGuard && entitlements.has(Feature.SIDELOAD_GUARD)) {
             val sent = alerts.raise(
@@ -308,6 +315,7 @@ class MessageGuard(
             )
             if (sent) context.startActivity(WarningActivity.intent(context, WarningActivity.Kind.OTP_DURING_CALL, otp.issuer.orEmpty()))
         }
+        bigDebit(pkg, sender, text)
         if (!policy.messageScan || !entitlements.has(Feature.SCAM_MESSAGE_SCAN)) return
         if (!AppCatalog.isMessaging(pkg)) return
         val verdict = scam.analyze(text, MessageContext(senderInContacts = senderInContacts(sender), duringCall = calls.inCall, sourcePackage = pkg, sender = sender))
@@ -330,6 +338,29 @@ class MessageGuard(
                 severity = if (verdict.level == RiskLevel.CRITICAL) AlertSeverity.CRITICAL else AlertSeverity.HIGH,
             )
         }
+    }
+
+    /** Large debits from bank pushes and bank SMS: the family hears about the amount, never the full message. */
+    private fun bigDebit(pkg: String, sender: String?, text: String) {
+        val policy = settings.current.elderPolicy
+        if (!policy.bigDebitAlert || !entitlements.has(Feature.BIG_DEBIT_ALERT)) return
+        val fromBank = pkg in AppCatalog.banks || (pkg in AppCatalog.smsApps && BankDebitParser.isBankSender(sender))
+        if (!fromBank) return
+        val debit = BankDebitParser.parse(text) ?: return
+        if (debit.amountRub < policy.bigDebitThresholdRub) return
+        val afterCall = calls.recentlyTalkedToUnknown
+        alerts.raise(
+            AlertType.BIG_DEBIT,
+            "${debit.kind.titleRu} ${formatRub(debit.amountRub)}",
+            buildString {
+                append("С карты ушло ${formatRub(debit.amountRub)}")
+                debit.merchant?.let { append(" — $it") }
+                append(if (afterCall) ". Это случилось после разговора с незнакомым номером — позвоните." else ". Если об этой трате ничего не известно — позвоните.")
+            },
+            dedupeKey = "debit-${text.hashCode()}", cooldownMs = 10 * 60_000L,
+            severity = if (afterCall && debit.kind == BankDebit.Kind.TRANSFER) AlertSeverity.CRITICAL else AlertSeverity.HIGH,
+            sourceApp = pkg, sourceAppLabel = appLabel(pkg),
+        )
     }
 
     private fun child(pkg: String, sender: String?, text: String) {

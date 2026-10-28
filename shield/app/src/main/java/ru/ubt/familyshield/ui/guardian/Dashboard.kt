@@ -453,6 +453,7 @@ fun requestSummary(req: ru.ubt.familyshield.core.db.RequestEntity): String {
         ru.ubt.familyshield.shared.model.RequestKind.APP_APPROVAL -> "хочет «${r.appLabel ?: r.packageName}»"
         ru.ubt.familyshield.shared.model.RequestKind.SITE_UNBLOCK -> "просит сайт ${r.domain}"
         ru.ubt.familyshield.shared.model.RequestKind.PROTECTION_CHANGE -> "хочет отключить защиту"
+        ru.ubt.familyshield.shared.model.RequestKind.REMOTE_ACCESS -> "хочет открыть «${r.appLabel ?: r.packageName}» (удалённый доступ)"
         null -> "запрос"
     }
 }

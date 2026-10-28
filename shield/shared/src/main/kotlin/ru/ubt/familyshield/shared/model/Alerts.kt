@@ -40,6 +40,7 @@ enum class AlertType(val defaultSeverity: AlertSeverity) {
     MEDICATION_TAKEN(AlertSeverity.INFO),
 
     TASK_DONE(AlertSeverity.INFO),
+    BIG_DEBIT(AlertSeverity.HIGH),
 }
 
 /**

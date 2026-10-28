@@ -1,13 +1,19 @@
 package ru.ubt.familyshield.ui.guardian
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Chat
@@ -16,7 +22,9 @@ import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.HourglassEmpty
 import androidx.compose.material.icons.rounded.InstallMobile
+import androidx.compose.material.icons.rounded.MedicalServices
 import androidx.compose.material.icons.rounded.Password
+import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.PersonalInjury
 import androidx.compose.material.icons.rounded.PhoneInTalk
 import androidx.compose.material.icons.rounded.PhoneLocked
@@ -32,6 +40,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import ru.ubt.familyshield.AppGraph
@@ -39,9 +49,12 @@ import ru.ubt.familyshield.core.db.MemberEntity
 import ru.ubt.familyshield.core.family.elderPolicy
 import ru.ubt.familyshield.shared.billing.Feature
 import ru.ubt.familyshield.shared.model.ElderPolicy
+import ru.ubt.familyshield.shared.policy.formatRub
 import ru.ubt.familyshield.ui.components.AvatarImage
 import ru.ubt.familyshield.ui.components.FeatureIcons
 import ru.ubt.familyshield.ui.components.IconTile
+import ru.ubt.familyshield.ui.components.TileRow
+import ru.ubt.familyshield.ui.elder.MedicalCardEditor
 import ru.ubt.familyshield.ui.paywall.PaywallScreen
 import ru.ubt.familyshield.ui.paywall.UpsellReason
 import ru.ubt.familyshield.ui.theme.Gradients
@@ -52,9 +65,19 @@ fun ElderControls(graph: AppGraph, member: MemberEntity, onBack: () -> Unit) {
     var paywall by remember { mutableStateOf<UpsellReason?>(null) }
     val policy = remember(member.policyJson) { member.elderPolicy() }
 
+    var medical by remember { mutableStateOf(false) }
+
     paywall?.let { PaywallScreen(graph, it) { paywall = null }; return }
 
     fun update(block: (ElderPolicy) -> ElderPolicy) = scope.launch { graph.guardian.updateElder(member.deviceId) { block(it) } }
+
+    if (medical) {
+        MedicalCardEditor(member.displayName, policy.medical, onBack = { medical = false }) { card ->
+            update { it.copy(medical = card) }
+            medical = false
+        }
+        return
+    }
     fun gate(feature: Feature, apply: () -> Unit) {
         if (graph.entitlements.has(feature)) apply() else paywall = UpsellReason.ELDER
     }
@@ -126,9 +149,22 @@ fun ElderControls(graph: AppGraph, member: MemberEntity, onBack: () -> Unit) {
                 ) { on ->
                     gate(Feature.SIDELOAD_GUARD) { update { it.copy(sideloadGuard = on) } }
                 }
+                IconToggleRow(
+                    "Сообщать о крупных списаниях", Icons.Rounded.Payments, Gradients.Sunrise, checked = policy.bigDebitAlert,
+                    subtitle = "По уведомлениям банка, только сумма. Включайте вместе с близким", locked = !graph.entitlements.has(Feature.BIG_DEBIT_ALERT),
+                ) { on ->
+                    gate(Feature.BIG_DEBIT_ALERT) { update { it.copy(bigDebitAlert = on) } }
+                }
+                if (policy.bigDebitAlert) {
+                    DebitThreshold(policy.bigDebitThresholdRub) { value -> update { it.copy(bigDebitThresholdRub = value) } }
+                }
             }
 
             GroupCard(title = "Забота и помощь") {
+                TileRow(
+                    "Медицинская карта", subtitle = if (policy.medical.isEmpty) "Группа крови, аллергии, лекарства — для скорой" else "Заполнена · появится рядом с SOS",
+                    icon = Icons.Rounded.MedicalServices, gradient = Gradients.Danger,
+                ) { medical = true }
                 IconToggleRow(
                     "Ежедневная отметка «Я в порядке»", Icons.Rounded.Favorite, Gradients.Coral, checked = policy.checkIn.enabled,
                     locked = !graph.entitlements.has(Feature.CHECK_IN),
@@ -179,6 +215,34 @@ fun ElderControls(graph: AppGraph, member: MemberEntity, onBack: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+private val debitThresholds = listOf(5_000, 10_000, 30_000, 50_000)
+
+/** Amount chips under the large-debit switch. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DebitThreshold(current: Int, onPick: (Int) -> Unit) {
+    FlowRow(
+        Modifier.fillMaxWidth().padding(start = 58.dp, bottom = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        debitThresholds.forEach { value ->
+            val selected = value == current
+            Box(
+                Modifier.clip(CircleShape)
+                    .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(role = Role.RadioButton) { onPick(value) }
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+            ) {
+                Text(
+                    "от ${formatRub(value.toLong())}", style = MaterialTheme.typography.labelMedium,
+                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
     }
 }

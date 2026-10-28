@@ -35,6 +35,9 @@ fun MemberEntity.childPolicy(): ChildPolicy =
 fun MemberEntity.elderPolicy(): ElderPolicy =
     policyJson?.let { runCatching { ShieldJson.decodeFromString(ElderPolicy.serializer(), it) }.getOrNull() } ?: ElderPolicy()
 
+/** How long remote access tools stay open after a guardian approved the request. */
+const val REMOTE_ACCESS_WINDOW = 2 * 60 * 60_000L
+
 val MemberEntity.memberRole: MemberRole get() = runCatching { MemberRole.valueOf(role) }.getOrDefault(MemberRole.CHILD)
 
 /**
@@ -98,6 +101,7 @@ class GuardianActions(
                 RequestKind.APP_APPROVAL -> r.packageName?.let { pkg -> updateChild(request.deviceId) { it.copy(approvedPackages = it.approvedPackages + pkg) } }
                 RequestKind.SITE_UNBLOCK -> r.domain?.let { d -> updateChild(request.deviceId) { it.copy(webFilter = it.webFilter.copy(allowedDomains = it.webFilter.allowedDomains + d)) } }
                 RequestKind.PROTECTION_CHANGE -> command(request.deviceId, Command.ApproveProtectionChange(UUID.randomUUID().toString(), r.id))
+                RequestKind.REMOTE_ACCESS -> updateElder(request.deviceId) { it.copy(remoteAccessAllowedUntil = clock() + REMOTE_ACCESS_WINDOW) }
             }
         } else if (r.kind == RequestKind.APP_APPROVAL && r.packageName != null) {
             updateChild(request.deviceId) {

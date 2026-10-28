@@ -48,6 +48,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.NotificationImportant
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.PhoneDisabled
 import androidx.compose.material.icons.rounded.PhonelinkLock
 import androidx.compose.material.icons.rounded.Person
@@ -236,6 +237,8 @@ fun AlertType.visual(): Visual = when (this) {
     AlertType.GEOFENCE_ENTER, AlertType.GEOFENCE_EXIT -> Visual(Icons.Rounded.LocationOn, Gradients.Ocean)
     AlertType.MEDICATION_MISSED -> Visual(Icons.Rounded.Medication, Gradients.Sunrise)
     AlertType.MEDICATION_TAKEN -> Visual(Icons.Rounded.Medication, Gradients.Emerald)
+    AlertType.BIG_DEBIT -> Visual(Icons.Rounded.Payments, Gradients.Sunrise)
+    AlertType.TASK_DONE -> Visual(Icons.Rounded.TaskAlt, Gradients.Emerald)
     else -> Visual(Icons.Rounded.Notifications, Gradients.Emerald)
 }
 

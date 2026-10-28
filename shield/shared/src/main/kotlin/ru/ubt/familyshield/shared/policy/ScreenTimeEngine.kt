@@ -181,3 +181,6 @@ fun formatMinutes(minutes: Int): String {
 }
 
 fun formatMinuteOfDay(minute: Int): String = "%02d:%02d".format((minute / 60) % 24, minute % 60)
+
+/** «15 000 ₽» with a narrow no-break space between thousands. */
+fun formatRub(amount: Long): String = String.format(java.util.Locale.US, "%,d", amount).replace(',', '\u202F') + " ₽"

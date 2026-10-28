@@ -262,6 +262,7 @@ class MessageHandler(
             RequestKind.APP_APPROVAL -> "$name хочет пользоваться «${r.appLabel ?: r.packageName}»"
             RequestKind.SITE_UNBLOCK -> "$name просит открыть сайт ${r.domain}"
             RequestKind.PROTECTION_CHANGE -> "$name хочет отключить защиту. Без вашего одобрения это произойдёт только через сутки"
+            RequestKind.REMOTE_ACCESS -> "$name хочет открыть «${r.appLabel ?: r.packageName}». Разрешайте, только если помогаете сами: мошенники просят установить такие программы"
         }
         notifier.request(r.id, "Запрос: $name", text)
     }

@@ -215,6 +215,19 @@ data class CheckInSettings(
     val graceMinutes: Int = 120,
 )
 
+/** «Медицинская карта»: what doctors need to know in an emergency. Filled in together with the family. */
+@Serializable
+data class MedicalCard(
+    val bloodType: String = "",
+    val allergies: String = "",
+    val conditions: String = "",
+    val medicines: String = "",
+    val doctorPhone: String = "",
+    val notes: String = "",
+) {
+    val isEmpty: Boolean get() = listOf(bloodType, allergies, conditions, medicines, doctorPhone, notes).all { it.isBlank() }
+}
+
 @Serializable
 data class MedicationReminder(
     val id: String,
@@ -255,6 +268,13 @@ data class ElderPolicy(
     val linkScan: Boolean = true,
     val newAppAlert: Boolean = true,
     val sideloadGuard: Boolean = true,
+    /** Tell guardians about large debits seen in bank notifications (opt-in, amounts only). */
+    val bigDebitAlert: Boolean = false,
+    val bigDebitThresholdRub: Int = 10_000,
+    /** «Вторая рука»: remote access tools open only until this time, after a guardian approved a request. */
+    val remoteAccessAllowedUntil: Long? = null,
+    /** For paramedics: shown on the elder's phone and to the family. */
+    val medical: MedicalCard = MedicalCard(),
     val checkIn: CheckInSettings = CheckInSettings(),
     /** Alert guardians if the phone was not used for this many hours (null = off). */
     val inactivityHours: Int? = 12,

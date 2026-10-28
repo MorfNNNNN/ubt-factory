@@ -113,6 +113,11 @@ object AlertAdvices {
             listOf("Позвоните и мягко напомните", "Проверьте, удобное ли время напоминания"),
             callFirst = true,
         )
+        AlertType.BIG_DEBIT -> AlertAdvice(
+            "С карты ушла крупная сумма. Если человек сам не планировал такую трату, возможно, его уговорили мошенники.",
+            listOf("Позвоните и спросите, что это за операция", "Если перевод сделан по просьбе звонящего — сразу звоните в банк по номеру на карте", "Подключите в банке «доверенное лицо» и лимиты"),
+            lessonId = "bank_security", callFirst = true,
+        )
         AlertType.CHECK_IN_OK, AlertType.MEDICATION_TAKEN, AlertType.TASK_DONE -> null
     }
 }

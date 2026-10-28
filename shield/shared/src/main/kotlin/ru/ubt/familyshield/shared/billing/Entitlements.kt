@@ -58,6 +58,7 @@ enum class Feature(val group: FeatureGroup, val minTier: Tier, val titleRu: Stri
     FALL_DETECTION(FeatureGroup.ELDER, Tier.PREMIUM, "Определение падения"),
     MEDICATIONS(FeatureGroup.ELDER, Tier.PREMIUM, "Напоминания о лекарствах"),
     REMOTE_SETUP(FeatureGroup.ELDER, Tier.PREMIUM, "Удалённая настройка телефона"),
+    BIG_DEBIT_ALERT(FeatureGroup.ELDER, Tier.PREMIUM, "Оповещение о крупных списаниях"),
 
     // Kids protection.
     APP_LIMITS(FeatureGroup.KIDS, Tier.PREMIUM, "Лимиты на приложения"),

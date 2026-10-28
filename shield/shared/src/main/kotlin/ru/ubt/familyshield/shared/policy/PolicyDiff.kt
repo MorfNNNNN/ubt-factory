@@ -59,9 +59,14 @@ object PolicyDiff {
         toggle(old.inCallBankGuard, new.inCallBankGuard, "Включена тревога «банк во время звонка»", "Выключена тревога «банк во время звонка»")?.let(::add)
         toggle(old.otpGuard, new.otpGuard, "Включена защита кодов из СМС", "Выключена защита кодов из СМС")?.let(::add)
         toggle(old.remoteAccessGuard, new.remoteAccessGuard, "Включена защита от удалённого доступа", "Выключена защита от удалённого доступа")?.let(::add)
+        if (new.remoteAccessAllowedUntil != null && new.remoteAccessAllowedUntil != old.remoteAccessAllowedUntil) {
+            add("Разрешены программы удалённого доступа до ${formatTime(new.remoteAccessAllowedUntil)}")
+        }
         toggle(old.messageScan, new.messageScan, "Включена проверка сообщений", "Выключена проверка сообщений")?.let(::add)
         toggle(old.linkScan, new.linkScan, "Включена проверка ссылок", "Выключена проверка ссылок")?.let(::add)
         toggle(old.sideloadGuard, new.sideloadGuard, "Включена защита от опасных приложений", "Выключена защита от опасных приложений")?.let(::add)
+        toggle(old.bigDebitAlert, new.bigDebitAlert, "Включены оповещения о списаниях от ${rub(new.bigDebitThresholdRub)}", "Выключены оповещения о крупных списаниях")?.let(::add)
+        if (old.bigDebitAlert && new.bigDebitAlert && old.bigDebitThresholdRub != new.bigDebitThresholdRub) add("Оповещать о списаниях от ${rub(new.bigDebitThresholdRub)}")
         toggle(old.checkIn.enabled, new.checkIn.enabled, "Включено ежедневное «Я в порядке» в ${formatMinuteOfDay(new.checkIn.reminderMinute)}", "Выключено ежедневное «Я в порядке»")?.let(::add)
         if (old.checkIn.enabled && new.checkIn.enabled && old.checkIn.reminderMinute != new.checkIn.reminderMinute) {
             add("«Я в порядке» теперь в ${formatMinuteOfDay(new.checkIn.reminderMinute)}")
@@ -76,6 +81,7 @@ object PolicyDiff {
         if (old.coolingOffHours != new.coolingOffHours) add("Отключить защиту можно только через ${new.coolingOffHours} ч")
         geofences(old.geofences.map { it.name }, new.geofences.map { it.name }).forEach(::add)
         if (old.trustedContacts != new.trustedContacts) add("Изменены контакты «Позвонить родным»")
+        if (old.medical != new.medical) add("Обновлена медицинская карта")
         toggle(old.webFilter.enabled, new.webFilter.enabled, "Включена защита от опасных сайтов", "Выключена защита от опасных сайтов")?.let(::add)
     }
 
@@ -87,6 +93,11 @@ object PolicyDiff {
     }
 
     private fun toggle(old: Boolean, new: Boolean, on: String, off: String): String? = if (old == new) null else if (new) on else off
+
+    private fun rub(amount: Int): String = formatRub(amount.toLong())
+
+    private fun formatTime(epochMillis: Long): String =
+        java.time.Instant.ofEpochMilli(epochMillis).atZone(java.time.ZoneId.systemDefault()).toLocalTime().let { "%02d:%02d".format(it.hour, it.minute) }
 
     private fun window(w: TimeWindow) = "${formatMinuteOfDay(w.startMinute)}–${formatMinuteOfDay(w.endMinute)}"
 

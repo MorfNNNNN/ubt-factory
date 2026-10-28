@@ -35,6 +35,7 @@ import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.GppGood
 import androidx.compose.material.icons.rounded.GppMaybe
 import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material.icons.rounded.MedicalServices
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PhotoLibrary
@@ -116,6 +117,7 @@ fun ElderHome(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState, activi
         "medications" -> { ElderMedications(state.settings.elderPolicy.medications) { screen = "home" }; return }
         "school" -> { SafetySchoolScreen(graph) { screen = "home" }; return }
         "gos" -> { GosProtectionsScreen(graph) { screen = "home" }; return }
+        "medical" -> { MedicalCardScreen(state.settings.displayName, state.settings.elderPolicy.medical) { screen = "home" }; return }
     }
 
     val health = remember(state.settings) { graph.protection.health.snapshot(MemberRole.ELDER, state.settings.childPolicy, state.settings.elderPolicy) }
@@ -151,6 +153,7 @@ fun ElderHome(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState, activi
         CheckerTile { screen = "checker" }
         LearnTile(Art3D.Notebook, "Уроки безопасности", schoolHint(state.settings.learning)) { screen = "school" }
         LearnTile(Art3D.Shield, "Госуслуги и банк", gosHint(state.settings.learning)) { screen = "gos" }
+        if (!state.settings.elderPolicy.medical.isEmpty) MedicalTile { screen = "medical" }
         apps.drop(2).chunked(2).forEach { AppRow(it[0], it.getOrNull(1)) }
     }
 }
@@ -164,6 +167,21 @@ private fun schoolHint(p: SafetyProgress): String {
 private fun gosHint(p: SafetyProgress): String {
     val done = GosProtections.steps.count { it.id in p.steps }
     return if (done == 0) "Запрет на кредиты и другие меры" else "Сделано $done из ${GosProtections.steps.size}"
+}
+
+/** «Медкарта для врачей»: opens the medical card in large type. */
+@Composable
+private fun MedicalTile(onClick: () -> Unit) {
+    SoftCard(onClick = onClick, padding = 16.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            IconTile(Icons.Rounded.MedicalServices, Gradients.Danger, size = 68.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Медкарта для врачей", style = MaterialTheme.typography.titleLarge)
+                Text("Группа крови, аллергии, лекарства", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+        }
+    }
 }
 
 /** A wide card with 3D art: lessons and the official-protection checklist. */

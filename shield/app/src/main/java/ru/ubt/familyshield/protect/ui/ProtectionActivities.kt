@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.FamilyRestroom
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.LockOpen
@@ -267,9 +268,9 @@ class WarningActivity : ComponentActivity() {
     enum class Kind { BANK_DURING_CALL, OTP_DURING_CALL, REMOTE_ACCESS, INSTALL_DURING_CALL }
 
     companion object {
-        fun intent(context: Context, kind: Kind, detail: String): Intent =
+        fun intent(context: Context, kind: Kind, detail: String, pkg: String? = null): Intent =
             Intent(context, WarningActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                .putExtra("kind", kind.name).putExtra("detail", detail)
+                .putExtra("kind", kind.name).putExtra("detail", detail).putExtra("pkg", pkg)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -277,8 +278,15 @@ class WarningActivity : ComponentActivity() {
         showOverLockScreen()
         val kind = runCatching { Kind.valueOf(intent.getStringExtra("kind").orEmpty()) }.getOrDefault(Kind.BANK_DURING_CALL)
         val detail = intent.getStringExtra("detail").orEmpty()
+        val pkg = intent.getStringExtra("pkg")
+        // The remote access tool must not come back when this screen closes.
+        if (kind == Kind.REMOTE_ACCESS) {
+            onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() = goHome()
+            })
+        }
         vibrate()
-        setContent { ShieldTheme(dark = false) { WarningScreen(kind, detail) } }
+        setContent { ShieldTheme(dark = false) { WarningScreen(kind, detail, pkg) } }
     }
 
     private fun vibrate() {
@@ -287,7 +295,9 @@ class WarningActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun WarningScreen(kind: Kind, detail: String) {
+    private fun WarningScreen(kind: Kind, detail: String, pkg: String?) {
+        val scope = rememberCoroutineScope()
+        var asked by remember { mutableStateOf(false) }
         val contacts by produceState(initialValue = emptyList<TrustedContact>()) { value = graph.protection.sos.contacts() }
         val (title, lines) = when (kind) {
             Kind.BANK_DURING_CALL -> "СТОП! Вы открыли банк во время звонка" to listOf(
@@ -303,6 +313,7 @@ class WarningActivity : ComponentActivity() {
             Kind.REMOTE_ACCESS -> "Осторожно: удалённый доступ" to listOf(
                 "Открыта программа «$detail». Через неё чужой человек видит ваш экран и коды.",
                 "Если её попросили установить по телефону — это мошенники. Закройте и удалите её.",
+                "Если вам помогает кто-то из семьи — попросите разрешение: программа откроется после их подтверждения.",
             )
             Kind.INSTALL_DURING_CALL -> "Не устанавливайте приложения по просьбе звонящего" to listOf(
                 "Мошенники просят установить «приложение банка» или «защиту», а на самом деле это вирус.",
@@ -329,7 +340,22 @@ class WarningActivity : ComponentActivity() {
                         finish()
                     }
                 }
-                BigButton("Я понял(а)", fill = White, content = Brand.Danger) { finish() }
+                if (kind == Kind.REMOTE_ACCESS && pkg != null) {
+                    if (asked) {
+                        NoticeCard("Запрос отправлен близким. Как только они разрешат, программа откроется.", Icons.Rounded.CheckCircle, Brand.GreenLight, Brand.GreenDark, textColor = Brand.Ink)
+                    } else {
+                        BigButton("Попросить разрешение у близких", Icons.Rounded.FamilyRestroom, fill = SolidColor(Color.White.copy(alpha = 0.22f))) {
+                            asked = true
+                            scope.launch {
+                                graph.sync.send(
+                                    FamilyPayload.Request(MemberRequest(UUID.randomUUID().toString(), RequestKind.REMOTE_ACCESS, System.currentTimeMillis(), packageName = pkg, appLabel = detail)),
+                                    Audience.GUARDIANS, urgent = true,
+                                )
+                            }
+                        }
+                    }
+                }
+                BigButton("Я понял(а)", fill = White, content = Brand.Danger) { if (kind == Kind.REMOTE_ACCESS) goHome() else finish() }
             }
         }
     }
@@ -431,6 +457,18 @@ class SosActivity : ComponentActivity() {
                         BigButton("Отменить", Icons.Rounded.Close, fill = White, content = Brand.Danger) { finish() }
                     } else {
                         Text("Близкие получили тревогу и ваше местоположение. Звоним…", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                        val medical = graph.settings.current.elderPolicy.medical
+                        if (!medical.isEmpty) {
+                            Column(
+                                Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(Color.White).padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text("Для врачей", color = Brand.Danger, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                listOf("Группа крови" to medical.bloodType, "Аллергии" to medical.allergies, "Заболевания" to medical.conditions, "Лекарства" to medical.medicines)
+                                    .filter { it.second.isNotBlank() }
+                                    .forEach { (k, v) -> Text("$k: $v", color = Brand.Ink, fontSize = 18.sp) }
+                            }
+                        }
                         BigButton("Закрыть", Icons.Rounded.Check, fill = White, content = Brand.Danger) { finish() }
                     }
                 }

@@ -68,12 +68,14 @@ internal fun ShieldTextField(
     label: String,
     modifier: Modifier = Modifier,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    singleLine: Boolean = true,
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        singleLine = true,
+        singleLine = singleLine,
+        maxLines = if (singleLine) 1 else 4,
         keyboardOptions = keyboardOptions,
         shape = MaterialTheme.shapes.medium,
         colors = OutlinedTextFieldDefaults.colors(

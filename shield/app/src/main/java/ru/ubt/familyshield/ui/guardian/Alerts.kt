@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.HelpOutline
+import androidx.compose.material.icons.automirrored.rounded.ScreenShare
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
@@ -261,6 +262,7 @@ private fun requestVisual(kind: RequestKind?): Visual = when (kind) {
     RequestKind.APP_APPROVAL -> Visual(Icons.Rounded.InstallMobile, Gradients.Violet)
     RequestKind.SITE_UNBLOCK -> Visual(Icons.Rounded.Language, Gradients.Violet)
     RequestKind.PROTECTION_CHANGE -> Visual(Icons.Rounded.GppMaybe, Gradients.Danger)
+    RequestKind.REMOTE_ACCESS -> Visual(Icons.AutoMirrored.Rounded.ScreenShare, Gradients.Danger)
     null -> Visual(Icons.AutoMirrored.Rounded.HelpOutline, Gradients.Slate)
 }
 
