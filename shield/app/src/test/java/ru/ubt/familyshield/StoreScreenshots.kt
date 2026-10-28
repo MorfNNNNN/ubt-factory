@@ -32,6 +32,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowSettings
 import ru.ubt.familyshield.core.db.AlertEntity
 import ru.ubt.familyshield.core.db.ChangeEntity
+import ru.ubt.familyshield.core.db.DailyStatEntity
 import ru.ubt.familyshield.core.db.LocationEntity
 import ru.ubt.familyshield.core.family.toEntity
 import ru.ubt.familyshield.core.db.MemberEntity
@@ -48,6 +49,9 @@ import ru.ubt.familyshield.shared.model.AgeBand
 import ru.ubt.familyshield.shared.model.ChildPolicy
 import ru.ubt.familyshield.shared.model.DeviceStatus
 import ru.ubt.familyshield.shared.model.ElderPolicy
+import ru.ubt.familyshield.shared.model.EventKind
+import ru.ubt.familyshield.shared.model.EventRepeat
+import ru.ubt.familyshield.shared.model.FamilyEvent
 import ru.ubt.familyshield.shared.model.MedicalCard
 import ru.ubt.familyshield.shared.model.FamilyTask
 import ru.ubt.familyshield.shared.model.GeoPoint
@@ -59,13 +63,18 @@ import ru.ubt.familyshield.shared.model.MemberRequest
 import ru.ubt.familyshield.shared.model.MemberRole
 import ru.ubt.familyshield.shared.model.ProtectionComponent
 import ru.ubt.familyshield.shared.model.RequestKind
+import ru.ubt.familyshield.shared.model.TrustLevel
 import ru.ubt.familyshield.shared.model.TrustedContact
 import ru.ubt.familyshield.ui.ShieldViewModel
 import ru.ubt.familyshield.ui.initialFamilyState
 import ru.ubt.familyshield.ui.familyStateFlow
 import ru.ubt.familyshield.ui.child.ChildHome
 import ru.ubt.familyshield.ui.elder.ElderHome
+import ru.ubt.familyshield.ui.calendar.FamilyCalendarScreen
 import ru.ubt.familyshield.ui.guardian.ChildControls
+import ru.ubt.familyshield.ui.guardian.WeekReportScreen
+import ru.ubt.familyshield.ui.trust.ChildTrustScreen
+import ru.ubt.familyshield.ui.trust.GuardianTrustScreen
 import ru.ubt.familyshield.ui.guardian.GuardianRoot
 import ru.ubt.familyshield.ui.onboarding.ConsentScreen
 import ru.ubt.familyshield.ui.paywall.PaywallScreen
@@ -74,6 +83,7 @@ import ru.ubt.familyshield.ui.theme.ShieldTheme
 import ru.ubt.familyshield.ui.tools.CheckerScreen
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
@@ -297,6 +307,51 @@ class StoreScreenshots {
                 ChangeEntity(memberDeviceId = "masha", actorDeviceId = "anna", text = "Разрешено новых приложений: 1", createdAt = now - 25 * min),
             ),
         )
+        // «Неделя семьи»: counters of this week and of the week before, for the comparison.
+        val today = java.time.LocalDate.now()
+        fun day(back: Long) = today.minusDays(back).toString()
+        listOf(0L, 2L, 5L).forEach { db.stats().add(day(it), "mama", "SCAM_CALL_BLOCKED") }
+        db.stats().add(day(0), "mama", "DANGER", 2)
+        db.stats().add(day(3), "mama", "SCAM_MESSAGE")
+        db.stats().add(day(3), "mama", "DANGER")
+        (1L..6L).forEach { db.stats().add(day(it), "mama", "CHECK_IN_OK") }
+        db.stats().add(day(1), "mama", "LESSON")
+        db.stats().add(day(0), "masha", "DANGER")
+        (1L..4L).forEach { db.stats().add(day(it), "masha", "TASK_DONE") }
+        listOf(1L, 4L).forEach { db.stats().add(day(it), "masha", "BLOCKED_SITE") }
+        listOf(95, 140, 160, 120, 175, 110, 130).forEachIndexed { i, m -> db.stats().put(DailyStatEntity(day(i.toLong()), "masha", "SCREEN", m)) }
+        listOf(8L, 9L, 11L, 12L, 13L).forEach { db.stats().add(day(it), "mama", "SCAM_CALL_BLOCKED") }
+        (7L..11L).forEach { db.stats().add(day(it), "mama", "CHECK_IN_OK") }
+        (8L..9L).forEach { db.stats().add(day(it), "masha", "TASK_DONE") }
+        listOf(150, 170, 160, 180, 165, 140, 155).forEachIndexed { i, m -> db.stats().put(DailyStatEntity(day(7L + i), "masha", "SCREEN", m)) }
+
+        // «Семейный календарь».
+        val zone = java.time.ZoneId.systemDefault()
+        fun at(ahead: Long, h: Int, m: Int = 0) = today.plusDays(ahead).atTime(h, m).atZone(zone).toInstant().toEpochMilli()
+        val week = now - 7 * 86_400_000L
+        listOf(
+            FamilyEvent(
+                "c1", "Забрать из школы", EventKind.PICKUP, at(0, 15), EventRepeat.WEEKLY, days = (1..5).toSet(),
+                forDeviceIds = setOf("masha"), assigneeDeviceId = "anna", assigneeName = "Анна", place = "Школа № 57", createdBy = "anna", createdAt = week,
+            ),
+            FamilyEvent(
+                "c2", "Бассейн", EventKind.CLUB, at(0, 17, 30), EventRepeat.WEEKLY, days = setOf(today.dayOfWeek.value, today.plusDays(2).dayOfWeek.value),
+                forDeviceIds = setOf("masha"), place = "Бассейн «Дельфин»", note = "Шапочка и полотенце", createdBy = "anna", createdAt = week,
+            ),
+            FamilyEvent(
+                "c3", "Кардиолог", EventKind.DOCTOR, at(1, 10), forDeviceIds = setOf("mama"), assigneeDeviceId = "anna", assigneeName = "Анна",
+                place = "Поликлиника № 12", remindMinutesBefore = 120, createdBy = "anna", createdAt = week,
+            ),
+            FamilyEvent(
+                "c4", "Родительское собрание", EventKind.SCHOOL, at(3, 18, 30), forDeviceIds = setOf("masha"), place = "Школа № 57",
+                createdBy = "anna", createdAt = week,
+            ),
+            FamilyEvent(
+                "c5", "День рождения Маши", EventKind.BIRTHDAY, at(5, 12), EventRepeat.YEARLY, remindMinutesBefore = 24 * 60,
+                createdBy = "anna", createdAt = week,
+            ),
+        ).forEach { db.calendar().upsert(it.toEntity()) }
+
         db.notes().insert(NoteEntity("n1", "mama", "Я дома, всё хорошо", createdAt = now - 90 * min, mine = false))
         db.notes().insert(NoteEntity("n2", "anna", "Отлично! Вечером заеду", createdAt = now - 85 * min, mine = true))
     }
@@ -379,7 +434,43 @@ class StoreScreenshots {
             compose.onNode(hasScrollAction()).performScrollToNode(hasText("Сообщать о крупных списаниях"))
             compose.mainClock.advanceTimeBy(1_000)
         }) { _, state -> ElderControls(graph, state.member("mama")) {} },
+        Screen("39-week", MemberRole.GUARDIAN) { _, state -> WeekReportScreen(graph, state, {}, {}, {}, {}) },
+        Screen("40-week-more", MemberRole.GUARDIAN, scrollTo("Совет на неделю")) { _, state -> WeekReportScreen(graph, state, {}, {}, {}, {}) },
+        Screen("41-calendar", MemberRole.GUARDIAN) { _, state -> FamilyCalendarScreen(graph, state) {} },
+        Screen("42-calendar-new", MemberRole.GUARDIAN, click("Добавить дело")) { _, state -> FamilyCalendarScreen(graph, state) {} },
+        Screen("43-calendar-new-more", MemberRole.GUARDIAN, { click("Добавить дело")(); scrollTo("Напомнить")() }) { _, state -> FamilyCalendarScreen(graph, state) {} },
+        Screen("44-child-day", MemberRole.CHILD, scrollTo("Мои дела")) { vm, state -> ChildHome(graph, vm, state) },
+        Screen("45-mom-day", MemberRole.ELDER, scrollTo("Мои дела")) { vm, state -> ElderHome(graph, vm, state, compose.activity) },
+        Screen("46-family-today", MemberRole.GUARDIAN, scrollTo("Сегодня в семье")) { vm, state -> GuardianRoot(graph, vm, state) },
+        Screen("49-week-bottom", MemberRole.GUARDIAN, scrollTo("Итоги по воскресеньям")) { _, state -> WeekReportScreen(graph, state, {}, {}, {}, {}) },
+        Screen("50-trust-child", MemberRole.CHILD) { _, state -> ChildTrustScreen(graph, state, {}, {}) },
+        Screen("51-trust-parent", MemberRole.GUARDIAN) { _, state -> GuardianTrustScreen(graph, state.member("masha")) {} },
+        Screen("52-child-home-trust", MemberRole.CHILD, scrollTo("Лестница доверия")) { vm, state -> ChildHome(graph, vm, state) },
+        Screen("53-trust-request", MemberRole.GUARDIAN, {
+            val ask = MemberRequest("r4", RequestKind.TRUST_LEVEL, now - 2 * min, level = TrustLevel.STEADY)
+            runBlocking { graph.db.requests().upsert(RequestEntity("r4", "masha", "TRUST_LEVEL", ShieldJson.encodeToString(MemberRequest.serializer(), ask), ask.createdAt)) }
+            settle()
+            tab("События")()
+        }) { vm, state -> GuardianRoot(graph, vm, state) },
+        Screen("47-calendar-add", MemberRole.GUARDIAN, scrollTo("Своё дело")) { _, state -> FamilyCalendarScreen(graph, state) {} },
+        Screen("48-calendar-new-bottom", MemberRole.GUARDIAN, { click("Добавить дело")(); scrollTo("Сохранить")() }) { _, state -> FamilyCalendarScreen(graph, state) {} },
     )
+
+    /** Room flows deliver on background threads: give them real time, then let compose draw the result. */
+    private fun settle() = repeat(10) {
+        Thread.sleep(40)
+        compose.mainClock.advanceTimeBy(100)
+    }
+
+    private fun scrollTo(text: String): () -> Unit = {
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText(text, substring = true))
+        compose.mainClock.advanceTimeBy(1_000)
+    }
+
+    private fun click(description: String): () -> Unit = {
+        compose.onNode(hasContentDescription(description) and hasClickAction()).performClick()
+        compose.mainClock.advanceTimeBy(1_000)
+    }
 
     private fun scroll(times: Int): () -> Unit = {
         repeat(times) {
@@ -409,7 +500,9 @@ class StoreScreenshots {
             }
         }
         val failed = mutableListOf<String>()
+        val only = System.getProperty("shield.only").orEmpty().split(',').filter { it.isNotBlank() }
         for (screen in screens) {
+            if (only.isNotEmpty() && only.none { screen.name.startsWith(it) }) continue
             runCatching {
                 runBlocking { seedFamily(screen.role) }
                 current = screen
@@ -420,7 +513,9 @@ class StoreScreenshots {
                     Thread.sleep(20)
                 }
                 compose.mainClock.advanceTimeBy(2_000)
+                settle()
                 screen.action?.invoke()
+                settle()
                 shot(screen.name)
             }.onFailure { failed += "${screen.name}: $it" }
         }

@@ -84,6 +84,12 @@ data class AppSettings(
     val elderSelfProtect: Boolean = false,
     /** This member's «Школа безопасности» progress and protection checklist. */
     val learning: SafetyProgress = SafetyProgress(),
+    /** Guardian: «Неделя семьи» notification on Sunday evenings. */
+    val weeklyDigest: Boolean = true,
+    /** ISO date of the Sunday the last weekly summary was sent for. */
+    val lastDigestDate: String = "",
+    /** Calendar reminders due before this moment have already been shown. */
+    val calendarNotifiedUntil: Long = 0,
 ) {
     val isPaired: Boolean get() = familyId != null && deviceId != null
     val isGuardian: Boolean get() = role == MemberRole.GUARDIAN
@@ -136,6 +142,9 @@ class SettingsStore(private val context: Context, private val box: SecretBox, sc
         val simpleHome = booleanPreferencesKey("simple_home")
         val elderSelfProtect = booleanPreferencesKey("elder_self_protect")
         val learning = stringPreferencesKey("learning_progress")
+        val weeklyDigest = booleanPreferencesKey("weekly_digest")
+        val lastDigestDate = stringPreferencesKey("last_digest_date")
+        val calendarNotifiedUntil = longPreferencesKey("calendar_notified_until")
     }
 
     private val store = context.dataStore
@@ -185,6 +194,9 @@ class SettingsStore(private val context: Context, private val box: SecretBox, sc
         simpleHome = p[K.simpleHome] ?: false,
         elderSelfProtect = p[K.elderSelfProtect] ?: false,
         learning = decode(SafetyProgress.serializer(), p[K.learning], SafetyProgress()),
+        weeklyDigest = p[K.weeklyDigest] ?: true,
+        lastDigestDate = p[K.lastDigestDate].orEmpty(),
+        calendarNotifiedUntil = p[K.calendarNotifiedUntil] ?: 0,
     )
 
     private val mutableState = MutableStateFlow(runBlocking { read(store.data.first()) })
@@ -255,6 +267,9 @@ class SettingsStore(private val context: Context, private val box: SecretBox, sc
     suspend fun setSimpleHome(on: Boolean) = update { it[K.simpleHome] = on }
     suspend fun setElderSelfProtect(on: Boolean) = update { it[K.elderSelfProtect] = on }
     suspend fun setLearning(progress: SafetyProgress) = update { it[K.learning] = ShieldJson.encodeToString(SafetyProgress.serializer(), progress) }
+    suspend fun setWeeklyDigest(on: Boolean) = update { it[K.weeklyDigest] = on }
+    suspend fun setLastDigestDate(date: String) = update { it[K.lastDigestDate] = date }
+    suspend fun setCalendarNotifiedUntil(t: Long) = update { it[K.calendarNotifiedUntil] = t }
 
     // --- Key material (sealed) ---
 

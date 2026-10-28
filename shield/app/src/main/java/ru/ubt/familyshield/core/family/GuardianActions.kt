@@ -25,6 +25,7 @@ import ru.ubt.familyshield.shared.protocol.FamilyPayload
 import ru.ubt.familyshield.shared.model.FamilyTask
 import ru.ubt.familyshield.shared.model.TaskRepeat
 import ru.ubt.familyshield.shared.model.TaskState
+import ru.ubt.familyshield.shared.model.TrustLevel
 import ru.ubt.familyshield.shared.model.approved
 import java.time.LocalDate
 import java.util.UUID
@@ -84,6 +85,12 @@ class GuardianActions(
     suspend fun command(memberId: String, command: Command) =
         sender().send(FamilyPayload.CommandIssued(memberId, command), Audience.DEVICES, listOf(memberId), urgent = true)
 
+    /** «Лестница доверия»: the perks are applied on the child's phone on top of the unchanged rules. */
+    suspend fun setTrustLevel(memberId: String, level: TrustLevel) = updateChild(memberId) { it.copy(trustLevel = level) }
+
+    /** «Отметься»: asks the person to confirm they are fine and share where they are. */
+    suspend fun askCheckIn(memberId: String) = command(memberId, Command.AskCheckIn(UUID.randomUUID().toString(), settings.current.displayName))
+
     suspend fun pause(memberId: String, untilMillis: Long?) = updateChild(memberId) { it.copy(pausedUntil = untilMillis ?: (clock() + 365L * 86_400_000L)) }
 
     suspend fun resume(memberId: String) = updateChild(memberId) { it.copy(pausedUntil = null) }
@@ -102,6 +109,7 @@ class GuardianActions(
                 RequestKind.SITE_UNBLOCK -> r.domain?.let { d -> updateChild(request.deviceId) { it.copy(webFilter = it.webFilter.copy(allowedDomains = it.webFilter.allowedDomains + d)) } }
                 RequestKind.PROTECTION_CHANGE -> command(request.deviceId, Command.ApproveProtectionChange(UUID.randomUUID().toString(), r.id))
                 RequestKind.REMOTE_ACCESS -> updateElder(request.deviceId) { it.copy(remoteAccessAllowedUntil = clock() + REMOTE_ACCESS_WINDOW) }
+                RequestKind.TRUST_LEVEL -> r.level?.let { level -> setTrustLevel(request.deviceId, level) }
             }
         } else if (r.kind == RequestKind.APP_APPROVAL && r.packageName != null) {
             updateChild(request.deviceId) {

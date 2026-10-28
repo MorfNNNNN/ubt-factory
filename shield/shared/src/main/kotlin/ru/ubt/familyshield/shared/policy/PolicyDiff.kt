@@ -47,6 +47,7 @@ object PolicyDiff {
         if (old.parentPin != new.parentPin) add(if (new.parentPin == null) "PIN родителя удалён" else "Задан новый PIN родителя")
         if (old.sosContacts != new.sosContacts) add("Изменены контакты для SOS")
         if (old.locationIntervalMinutes != new.locationIntervalMinutes) add("Местоположение обновляется раз в ${new.locationIntervalMinutes} мин")
+        if (old.trustLevel != new.trustLevel) add("Уровень доверия: «${old.trustLevel.title}» → «${new.trustLevel.title}»")
     }
 
     fun elder(old: ElderPolicy, new: ElderPolicy): List<String> = buildList {

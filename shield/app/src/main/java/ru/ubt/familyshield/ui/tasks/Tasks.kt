@@ -1,8 +1,6 @@
 package ru.ubt.familyshield.ui.tasks
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,7 +56,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -87,6 +84,7 @@ import ru.ubt.familyshield.ui.guardian.DetailScaffold
 import ru.ubt.familyshield.ui.guardian.HeroChip
 import ru.ubt.familyshield.ui.guardian.PillButton
 import ru.ubt.familyshield.ui.guardian.plural
+import ru.ubt.familyshield.ui.guardian.ChoiceChip
 import ru.ubt.familyshield.ui.guardian.tintedFill
 import ru.ubt.familyshield.ui.theme.Brand
 import ru.ubt.familyshield.ui.theme.Gradients
@@ -305,23 +303,6 @@ private fun NewTaskDialog(template: TaskTemplate, onDismiss: () -> Unit, onCreat
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
     )
-}
-
-@Composable
-private fun ChoiceChip(text: String, selected: Boolean, onClick: () -> Unit) {
-    val shape = CircleShape
-    Box(
-        Modifier.clip(shape)
-            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-            .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, shape)
-            .clickable(role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-    ) {
-        Text(
-            text, style = MaterialTheme.typography.labelMedium,
-            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-        )
-    }
 }
 
 // ---- Shared pieces ----------------------------------------------------------------------------------

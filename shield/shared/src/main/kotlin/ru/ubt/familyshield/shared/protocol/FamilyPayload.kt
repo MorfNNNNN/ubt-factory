@@ -9,6 +9,7 @@ import ru.ubt.familyshield.shared.model.ChildPolicy
 import ru.ubt.familyshield.shared.model.Command
 import ru.ubt.familyshield.shared.model.DeviceStatus
 import ru.ubt.familyshield.shared.model.ElderPolicy
+import ru.ubt.familyshield.shared.model.FamilyEvent
 import ru.ubt.familyshield.shared.model.FamilyNote
 import ru.ubt.familyshield.shared.model.FamilyTask
 import ru.ubt.familyshield.shared.model.LocationFix
@@ -144,6 +145,13 @@ sealed class FamilyPayload {
     @Serializable
     @SerialName("learning")
     data class Learning(val progress: SafetyProgress) : FamilyPayload()
+
+    /** A guardian adds, changes or removes ([FamilyEvent.deleted]) an event of «Семейный календарь». */
+    @Serializable
+    @SerialName("calendar")
+    data class CalendarUpdate(val event: FamilyEvent) : FamilyPayload() {
+        override val requiresGuardianSignature: Boolean get() = true
+    }
 
     /** Signed entitlement token issued by the server, re-shared so offline devices can verify the plan. */
     @Serializable

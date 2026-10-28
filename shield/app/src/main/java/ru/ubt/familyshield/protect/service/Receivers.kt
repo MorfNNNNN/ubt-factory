@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import kotlinx.coroutines.launch
 import ru.ubt.familyshield.ShieldApp
+import ru.ubt.familyshield.core.family.FamilyCalendar
 import ru.ubt.familyshield.protect.Reminders
 import ru.ubt.familyshield.shared.model.AlertType
 
@@ -32,7 +33,7 @@ class ShieldDeviceAdmin : DeviceAdminReceiver() {
     }
 }
 
-/** Medication and check-in alarms and their notification actions. */
+/** Medication, check-in and family calendar alarms and their notification actions. */
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val graph = (context.applicationContext as ShieldApp).graph
@@ -48,8 +49,9 @@ class ReminderReceiver : BroadcastReceiver() {
                     Reminders.ACTION_MED_SNOOZE -> r.snooze(id, slot)
                     Reminders.ACTION_MED_CHECK -> r.checkMedicationTaken(id, slot)
                     Reminders.ACTION_CHECKIN -> r.onCheckInReminder(slot)
-                    Reminders.ACTION_CHECKIN_DONE -> graph.checkIn()
+                    Reminders.ACTION_CHECKIN_DONE -> graph.checkIn(answered = slot == Reminders.SLOT_ASKED)
                     Reminders.ACTION_CHECKIN_CHECK -> r.checkCheckInDone(slot)
+                    FamilyCalendar.ACTION_ALARM -> graph.calendar.onAlarm()
                 }
             } finally {
                 pending.finish()

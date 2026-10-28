@@ -161,6 +161,8 @@ class Reminders(
         const val ACTION_CHECKIN_CHECK = "ru.ubt.familyshield.CHECKIN_CHECK"
         const val EXTRA_ID = "id"
         const val EXTRA_SLOT = "slot"
+        /** Slot of the check-in that answers a guardian's «Отметься». */
+        const val SLOT_ASKED = "asked"
     }
 
     private fun pending(action: String, id: String, slot: String, request: Int): PendingIntent {
@@ -239,6 +241,13 @@ class Reminders(
         val grace = settings.current.elderPolicy.checkIn.graceMinutes
         setAlarm(System.currentTimeMillis() + grace * 60_000L, pending(ACTION_CHECKIN_CHECK, "checkin", slot, 9_002))
         rescheduleAll()
+    }
+
+    /** «Отметься»: a guardian asks; one tap answers «Я в порядке» with the location. Nothing is sent without the tap. */
+    fun onCheckInAsked(fromName: String) {
+        val done = NotificationCompat.Action(0, "Отметиться", pending(ACTION_CHECKIN_DONE, "checkin", SLOT_ASKED, 9_003))
+        val title = if (fromName.isBlank()) "Вас просят отметиться" else "$fromName просит отметиться"
+        notifier.reminder(Notifier.ID_CHECK_IN, title, "Нажмите «Отметиться» — близкие увидят, что у вас всё хорошо и где вы", notifier.openAppIntent(null), listOf(done))
     }
 
     suspend fun checkCheckInDone(slot: String) {

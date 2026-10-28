@@ -1,5 +1,10 @@
 package ru.ubt.familyshield.ui.guardian
 
+import ru.ubt.familyshield.ui.trust.GuardianTrustScreen
+import ru.ubt.familyshield.shared.model.TrustLevel
+import androidx.compose.material.icons.rounded.Stairs
+import androidx.compose.material.icons.rounded.WavingHand
+import ru.ubt.familyshield.shared.model.withTrust
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -80,7 +85,7 @@ import ru.ubt.familyshield.ui.theme.Brand
 import ru.ubt.familyshield.ui.theme.Gradients
 import java.util.UUID
 
-private enum class Detail { OVERVIEW, CONTROLS, LOCATION, APPS, SECURITY, TASKS, SAFETY, CHANGES }
+private enum class Detail { OVERVIEW, CONTROLS, LOCATION, APPS, SECURITY, TASKS, SAFETY, CHANGES, TRUST }
 
 @Composable
 fun MemberDetailScreen(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState, member: MemberEntity, onBack: () -> Unit) {
@@ -98,6 +103,7 @@ fun MemberDetailScreen(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiStat
         Detail.TASKS -> GuardianTasksScreen(graph, member) { screen = Detail.OVERVIEW }
         Detail.SAFETY -> MemberSafetyScreen(member) { screen = Detail.OVERVIEW }
         Detail.CHANGES -> ChangeLogScreen(graph, member.deviceId, "Журнал: ${member.displayName}", state.members) { screen = Detail.OVERVIEW }
+        Detail.TRUST -> GuardianTrustScreen(graph, member) { screen = Detail.OVERVIEW }
     }
 }
 
@@ -106,6 +112,7 @@ private fun Overview(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState,
     val scope = rememberCoroutineScope()
     val isChild = member.memberRole == MemberRole.CHILD
     var confirmRemove by remember { mutableStateOf(false) }
+    var askedCheckIn by remember { mutableStateOf(false) }
     val status = remember(member.statusJson) { member.deviceStatus() }
     val score = remember(member.securityJson) {
         member.securityJson?.let { runCatching { ru.ubt.familyshield.shared.ShieldJson.decodeFromString(SecurityReport.serializer(), it) }.getOrNull() }?.score
@@ -126,7 +133,12 @@ private fun Overview(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState,
             SoftCard(padding = 14.dp) {
                 Row(Modifier.fillMaxWidth()) {
                     if (isChild) {
-                        QuickAction("Пауза", Icons.Rounded.PauseCircle, Gradients.Sunrise) { scope.launch { graph.guardian.pause(member.deviceId, null) } }
+                        val paused = (member.childPolicy().pausedUntil ?: 0) > System.currentTimeMillis()
+                        if (paused) {
+                            QuickAction("Снять паузу", Icons.Rounded.PlayCircle, Gradients.Emerald) { scope.launch { graph.guardian.resume(member.deviceId) } }
+                        } else {
+                            QuickAction("Пауза", Icons.Rounded.PauseCircle, Gradients.Sunrise) { scope.launch { graph.guardian.pause(member.deviceId, null) } }
+                        }
                     } else {
                         QuickAction("Найти телефон", Icons.Rounded.RingVolume, Gradients.Coral) { cmd(Command.Ring(UUID.randomUUID().toString(), 30)) }
                     }
@@ -136,7 +148,11 @@ private fun Overview(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState,
                     }
                     if (isChild) {
                         QuickAction("+15 мин", Icons.Rounded.MoreTime, Gradients.Sky) { scope.launch { graph.guardian.bonus(member.deviceId, 15, "Бонус") } }
-                        QuickAction("Снять паузу", Icons.Rounded.PlayCircle, Gradients.Emerald) { scope.launch { graph.guardian.resume(member.deviceId) } }
+                    }
+                    // «Отметься» instead of watching: the person answers with one tap and shares where they are.
+                    QuickAction(if (askedCheckIn) "Попросили" else "Отметься", Icons.Rounded.WavingHand, Gradients.Violet) {
+                        askedCheckIn = true
+                        scope.launch { graph.guardian.askCheckIn(member.deviceId) }
                     }
                 }
             }
@@ -159,6 +175,10 @@ private fun Overview(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState,
                     ) { open(Detail.LOCATION) }
                     if (isChild) {
                         TileRow("Задания и награды", subtitle = taskSummary(graph, member.deviceId), icon = Icons.Rounded.EmojiEvents, gradient = Gradients.Sunrise) { open(Detail.TASKS) }
+                        val trust = member.childPolicy()
+                        if (TrustLevel.availableFor(trust.ageBand)) {
+                            TileRow("Лестница доверия", subtitle = "Уровень «${trust.trustLevel.title}»", icon = Icons.Rounded.Stairs, gradient = Gradients.Emerald) { open(Detail.TRUST) }
+                        }
                         TileRow("Приложения и экранное время", subtitle = "Что установлено и что заблокировано", icon = Icons.Rounded.Apps, gradient = Gradients.Violet) { open(Detail.APPS) }
                     }
                     TileRow("Школа безопасности", subtitle = safetySummary(member), icon = Icons.Rounded.School, gradient = Gradients.Violet) { open(Detail.SAFETY) }
@@ -263,7 +283,7 @@ private fun HealthRow(icon: ImageVector, gradient: Brush, title: String, text: S
 /** Today's screen time against today's limit (bonuses included). */
 @Composable
 private fun ScreenTimeCard(member: MemberEntity, minutes: Int) {
-    val limit = remember(member.policyJson) { ScreenTimeEngine.dailyLimit(member.childPolicy(), Clock.of(System.currentTimeMillis())) }
+    val limit = remember(member.policyJson) { ScreenTimeEngine.dailyLimit(member.childPolicy().withTrust(), Clock.of(System.currentTimeMillis())) }
     SoftCard(padding = 16.dp) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             IconTile(Icons.Rounded.HourglassBottom, Gradients.Sky, size = 46.dp)

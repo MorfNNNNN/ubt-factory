@@ -16,6 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import ru.ubt.familyshield.core.db.MemberEntity
+import ru.ubt.familyshield.core.db.RequestEntity
 import ru.ubt.familyshield.core.db.ShieldDatabase
 import ru.ubt.familyshield.core.family.FamilyActions
 import ru.ubt.familyshield.core.family.GuardianActions
@@ -24,7 +25,11 @@ import ru.ubt.familyshield.core.family.childPolicy
 import ru.ubt.familyshield.core.family.task
 import ru.ubt.familyshield.core.prefs.SettingsStore
 import ru.ubt.familyshield.core.security.MemorySecretBox
+import ru.ubt.familyshield.shared.ShieldJson
+import ru.ubt.familyshield.shared.model.MemberRequest
 import ru.ubt.familyshield.shared.model.MemberRole
+import ru.ubt.familyshield.shared.model.RequestKind
+import ru.ubt.familyshield.shared.model.TrustLevel
 import ru.ubt.familyshield.shared.model.TaskRepeat
 import ru.ubt.familyshield.shared.model.TaskState
 import ru.ubt.familyshield.shared.protocol.FamilyPayload
@@ -74,6 +79,26 @@ class FamilyFeaturesTest {
         GuardianActions(settings, db, { sender }).updateChild("kid") { it.copy(dailyLimitWeekdayMinutes = 60) }
         val lines = db.changes().observeFor("kid").first().map { it.text }
         assertTrue(lines.toString(), lines.any { it.startsWith("Лимит в будни") && it.endsWith("1 ч") })
+    }
+
+    @Test
+    fun approvedTrustRequestRaisesTheLevelAndIsJournaled() = runBlocking {
+        val ask = MemberRequest("r1", RequestKind.TRUST_LEVEL, 0, level = TrustLevel.STEADY)
+        db.requests().upsert(RequestEntity("r1", "kid", "TRUST_LEVEL", ShieldJson.encodeToString(MemberRequest.serializer(), ask), 0))
+        GuardianActions(settings, db, { sender }).decide(db.requests().get("r1")!!, approved = true)
+        assertEquals(TrustLevel.STEADY, db.members().get("kid")!!.childPolicy().trustLevel)
+        assertTrue(db.changes().observeFor("kid").first().any { it.text == "Уровень доверия: «Старт» → «Надёжный»" })
+        assertTrue(sent.any { it is FamilyPayload.ChildPolicyUpdate && it.policy.trustLevel == TrustLevel.STEADY })
+    }
+
+    @Test
+    fun childKeepsItsTrustRequestUntilAnswered() = runBlocking {
+        settings.setCredentials("kid", "token")
+        settings.setRole(MemberRole.CHILD)
+        FamilyActions(settings, db, { sender }).askTrustLevel(TrustLevel.STEADY)
+        val pending = db.requests().observePending().first().single()
+        assertEquals(RequestKind.TRUST_LEVEL.name, pending.kind)
+        assertEquals(TrustLevel.STEADY, (sent.last() as FamilyPayload.Request).request.level)
     }
 
     @Test

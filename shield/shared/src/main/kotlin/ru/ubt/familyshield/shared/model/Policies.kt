@@ -170,6 +170,8 @@ data class ChildPolicy(
     val warnBeforeLimitMinutes: Int = 5,
     /** Lets a parent temporarily unlock protected settings on the child's phone. */
     val parentPin: PinHash? = null,
+    /** «Лестница доверия»: perks on top of these rules, see [withTrust]. */
+    val trustLevel: TrustLevel = TrustLevel.START,
 )
 
 @Serializable

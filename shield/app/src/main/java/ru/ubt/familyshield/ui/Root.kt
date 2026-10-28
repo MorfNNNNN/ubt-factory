@@ -5,6 +5,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -48,10 +51,12 @@ fun ShieldRoot(graph: AppGraph, activity: ComponentActivity, routeRequests: Muta
             s.role == MemberRole.ELDER -> Routes.ELDER
             else -> Routes.GUARDIAN
         }
+        var deepLink by remember { mutableStateOf<String?>(null) }
         LaunchedEffect(Unit) { vm.refresh() }
         LaunchedEffect(pendingRoute) {
             val route = pendingRoute ?: return@LaunchedEffect
             navigateForDeepLink(nav, route, s.role)
+            if (!route.startsWith("pair:")) deepLink = route
             routeRequests.value = null
         }
 
@@ -69,7 +74,7 @@ fun ShieldRoot(graph: AppGraph, activity: ComponentActivity, routeRequests: Muta
                     nav.navigate(dest) { popUpTo(Routes.ONBOARDING) { inclusive = true }; launchSingleTop = true }
                 }
             }
-            composable(Routes.GUARDIAN) { GuardianRoot(graph, vm, state) }
+            composable(Routes.GUARDIAN) { GuardianRoot(graph, vm, state, deepLink) { deepLink = null } }
             composable(Routes.CHILD) { ChildHome(graph, vm, state) }
             composable(Routes.ELDER) { ElderHome(graph, vm, state, activity) }
         }

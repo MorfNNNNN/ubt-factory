@@ -1,5 +1,6 @@
 package ru.ubt.familyshield.ui.child
 
+import ru.ubt.familyshield.shared.model.withTrust
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -80,12 +81,15 @@ import ru.ubt.familyshield.ui.guardian.ChangeLogScreen
 import ru.ubt.familyshield.ui.components.SosPulse
 import ru.ubt.familyshield.ui.safety.SafetySchoolScreen
 import ru.ubt.familyshield.ui.setup.PermissionWizard
+import ru.ubt.familyshield.ui.calendar.MyDayCard
 import ru.ubt.familyshield.ui.tasks.ChildTasksCard
+import ru.ubt.familyshield.ui.trust.ChildTrustScreen
+import ru.ubt.familyshield.ui.trust.TrustCard
 import ru.ubt.familyshield.ui.tasks.ChildTasksScreen
 import ru.ubt.familyshield.ui.theme.Brand
 import ru.ubt.familyshield.ui.theme.Gradients
 
-private enum class ChildPage { HOME, TASKS, SCHOOL, CHANGES }
+private enum class ChildPage { HOME, TASKS, SCHOOL, CHANGES, TRUST }
 
 /** The child's own screen: honest, friendly, shows their time left and lets them reach parents and SOS. */
 @Composable
@@ -99,10 +103,11 @@ fun ChildHome(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState) {
         ChildPage.TASKS -> { ChildTasksScreen(graph) { page = ChildPage.HOME }; return }
         ChildPage.SCHOOL -> { SafetySchoolScreen(graph) { page = ChildPage.HOME }; return }
         ChildPage.CHANGES -> { ChangeLogScreen(graph, state.settings.deviceId.orEmpty(), "Что меняли родители", state.members) { page = ChildPage.HOME }; return }
+        ChildPage.TRUST -> { ChildTrustScreen(graph, state, onBack = { page = ChildPage.HOME }, onTasks = { page = ChildPage.TASKS }); return }
         ChildPage.HOME -> Unit
     }
 
-    val policy = state.settings.childPolicy
+    val policy = state.settings.childPolicy.withTrust()
     val snapshot = remember(state.self?.todayMinutes) { UsageSnapshot(state.self?.todayMinutes ?: 0, emptyMap(), emptyMap()) }
     val clock = Clock.of(System.currentTimeMillis())
     val limit = ScreenTimeEngine.dailyLimit(policy, clock)
@@ -159,7 +164,11 @@ fun ChildHome(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState) {
             }
         }
 
+        MyDayCard(graph)
+
         ChildTasksCard(graph) { page = ChildPage.TASKS }
+
+        TrustCard(graph, state) { page = ChildPage.TRUST }
 
         SosCard { context.startActivity(Intent(context, SosActivity::class.java)) }
 

@@ -49,10 +49,15 @@ sealed class Command {
     @Serializable
     @SerialName("report")
     data class RequestReport(override val id: String) : Command()
+
+    /** «Отметься»: asks the person to confirm they are fine and share where they are, instead of tracking them. */
+    @Serializable
+    @SerialName("ask_check_in")
+    data class AskCheckIn(override val id: String, val fromName: String = "") : Command()
 }
 
 @Serializable
-enum class RequestKind { MORE_TIME, APP_APPROVAL, SITE_UNBLOCK, PROTECTION_CHANGE, REMOTE_ACCESS }
+enum class RequestKind { MORE_TIME, APP_APPROVAL, SITE_UNBLOCK, PROTECTION_CHANGE, REMOTE_ACCESS, TRUST_LEVEL }
 
 /** Requests initiated on a protected device (by a child or an elder) that a guardian decides on. */
 @Serializable
@@ -65,6 +70,8 @@ data class MemberRequest(
     val appLabel: String? = null,
     val domain: String? = null,
     val reason: String = "",
+    /** [RequestKind.TRUST_LEVEL]: the level the child asks for. */
+    val level: TrustLevel? = null,
 )
 
 @Serializable
@@ -101,4 +108,9 @@ data class CheckIn(
     val createdAt: Long,
     val mood: String = "ok",
     val location: GeoPoint? = null,
-)
+) {
+    companion object {
+        /** The check-in answers a guardian's «Отметься». */
+        const val MOOD_ANSWERED = "answered"
+    }
+}

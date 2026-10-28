@@ -1,5 +1,6 @@
 package ru.ubt.familyshield.protect
 
+import ru.ubt.familyshield.shared.model.withTrust
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -122,7 +123,7 @@ class ChildEnforcer(
     fun evaluate(pkg: String): AccessDecision {
         val s = settings.current
         if (s.role != MemberRole.CHILD || s.protectionPaused) return AccessDecision.Allowed(null, false)
-        var policy = s.childPolicy
+        var policy = s.childPolicy.withTrust()
         // Paid rules are only enforced with an active plan; bedtime and pause work on the free plan.
         if (!entitlements.has(Feature.APP_LIMITS)) policy = policy.copy(categoryLimits = emptyMap(), appRules = policy.appRules.filterValues { it.mode != ru.ubt.familyshield.shared.model.AppMode.DEFAULT || it.dailyLimitMinutes == null })
         if (!entitlements.has(Feature.APP_BLOCKING)) policy = policy.copy(appRules = policy.appRules.filterValues { it.mode != ru.ubt.familyshield.shared.model.AppMode.BLOCKED })
@@ -364,7 +365,7 @@ class MessageGuard(
     }
 
     private fun child(pkg: String, sender: String?, text: String) {
-        val policy = settings.current.childPolicy
+        val policy = settings.current.childPolicy.withTrust()
         val monitoring = policy.messageMonitoring
         if (!monitoring.enabled || !entitlements.has(Feature.RISK_ALERTS) || !AppCatalog.isMessaging(pkg)) return
         val verdict = childRisk.analyze(text)

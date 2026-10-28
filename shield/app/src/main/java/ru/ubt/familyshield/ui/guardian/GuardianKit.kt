@@ -69,7 +69,6 @@ import ru.ubt.familyshield.ui.components.severityLabel
 import ru.ubt.familyshield.ui.theme.Brand
 import ru.ubt.familyshield.ui.theme.Gradients
 import java.time.LocalTime
-import kotlin.math.abs
 
 /*
  * Premium building blocks shared by the guardian screens (and the chat, location and invite screens
@@ -205,6 +204,25 @@ internal fun BoxScope.HeroHalo() {
 }
 
 // ---- Rows and controls ---------------------------------------------------------------------------
+
+/** Pill-shaped single choice (reward, repeat, reminder time); [icon] is optional. */
+@Composable
+internal fun ChoiceChip(text: String, selected: Boolean, icon: ImageVector? = null, onClick: () -> Unit) {
+    val shape = CircleShape
+    val content = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    Row(
+        Modifier.clip(shape)
+            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+            .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, shape)
+            .clickable(role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = if (icon != null) 12.dp else 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (icon != null) Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(18.dp))
+        Text(text, style = MaterialTheme.typography.labelMedium, color = content)
+    }
+}
 
 /** Setting row: glyph tile, title, hint, premium chip and a switch. The whole row toggles. */
 @Composable
@@ -461,16 +479,7 @@ internal fun greeting(name: String, hour: Int = LocalTime.now().hour): String {
 }
 
 /** Russian plural form for [n]: plural(5, "запрос", "запроса", "запросов") = "запросов". */
-internal fun plural(n: Int, one: String, few: String, many: String): String {
-    val mod100 = abs(n) % 100
-    val mod10 = mod100 % 10
-    return when {
-        mod100 in 11..14 -> many
-        mod10 == 1 -> one
-        mod10 in 2..4 -> few
-        else -> many
-    }
-}
+internal fun plural(n: Int, one: String, few: String, many: String): String = ru.ubt.familyshield.shared.content.plural(n, one, few, many)
 
 /** Width of an [ru.ubt.familyshield.ui.components.AvatarStack] of [count] portraits, which overlap by 38 %. */
 internal fun avatarStackWidth(count: Int, size: Dp): Dp = if (count <= 0) 0.dp else size + size * 0.62f * (count - 1)

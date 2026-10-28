@@ -27,11 +27,11 @@ FRAMES = [
     ("35-alerts-advice.png@290", "Предупредим, если маму обманывают", "И подскажем, что делать прямо сейчас", "coral", "ic3d_call_ringing"),
     ("15-mom-home.png", "Простой режим для родителей", "Крупные кнопки, SOS и «Я в порядке»", "violet", "ic3d_notify_heart"),
     ("17-child-home.png", "Разумные правила для детей", "Экранное время, сон, уроки и SOS", "sky", "ic3d_stopwatch"),
-    ("22-tasks-child.png", "Задания и награды", "Минуты к экранному времени за уборку и уроки", "sunrise", "ic3d_trophy"),
-    ("23-school.png", "Школа безопасности", "Короткие уроки о схемах мошенников", "violet", "ic3d_notebook"),
-    ("25-gos.png", "Самозапрет на кредиты — по шагам", "И ещё 6 бесплатных официальных мер", "emerald", "ic3d_locker"),
-    ("11-location.png", "Где ребёнок и как прошёл день", "Геозоны и хронология: дом, школа, секция", "ocean", "ic3d_map_pin"),
-    ("13-checker.png", "Проверка звонков, ссылок и СМС", "Анализ прямо на телефоне", "night", "ic3d_link"),
+    ("41-calendar.png", "Семейный календарь", "Кто кого забирает, кружки и врачи", "ocean", "ic3d_calendar"),
+    ("39-week.png", "Неделя семьи", "Итоги семьи каждое воскресенье", "emerald", "ic3d_star"),
+    ("11-location.png", "Где ребёнок и как прошёл день", "Геозоны и хронология: дом, школа, секция", "night", "ic3d_map_pin"),
+    ("25-gos.png", "Самозапрет на кредиты — по шагам", "И ещё 6 бесплатных официальных мер", "sunrise", "ic3d_locker"),
+    ("50-trust-child.png", "Правила мягчают вместе с доверием", "Задания, баллы и новый уровень свободы", "sky", "ic3d_medal"),
     ("18-consent.png", "Защита, а не слежка", "Личная переписка остаётся личной", "emerald", "ic3d_lock"),
 ]
 
@@ -45,8 +45,18 @@ def gradient(top, bottom):
     return img
 
 
+SHORT = {"в", "во", "с", "со", "и", "а", "к", "ко", "о", "об", "у", "на", "по", "от", "за", "до", "из", "не"}
+
+
 def wrap(draw, text, font, width):
-    words, lines, cur = text.split(), [], ""
+    # A short preposition never ends a line and a dash never starts one.
+    words = []
+    for w in text.split():
+        if words and (w == "—" or words[-1].split(" ")[-1].lower() in SHORT):
+            words[-1] += " " + w
+        else:
+            words.append(w)
+    lines, cur = [], ""
     for w in words:
         test = (cur + " " + w).strip()
         if draw.textlength(test, font=font) <= width:

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.automirrored.rounded.ScreenShare
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Stairs
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -75,6 +76,7 @@ import ru.ubt.familyshield.ui.FamilyUiState
 import ru.ubt.familyshield.ui.ShieldViewModel
 import ru.ubt.familyshield.ui.components.AvatarImage
 import ru.ubt.familyshield.ui.components.FeatureIcons
+import ru.ubt.familyshield.ui.components.GlyphLine
 import ru.ubt.familyshield.ui.components.IconTile
 import ru.ubt.familyshield.ui.components.LottieView
 import ru.ubt.familyshield.ui.components.SectionHeader
@@ -243,6 +245,10 @@ private fun RequestCard(graph: AppGraph, req: RequestEntity, member: MemberEntit
             }
         }
         request?.reason?.takeIf { it.isNotBlank() }?.let { QuoteBlock("«$it»", accent = Brand.Blue) }
+        request?.level?.takeIf { request.kind == RequestKind.TRUST_LEVEL }?.let { level ->
+            Text("Что изменится", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            level.perks.forEach { GlyphLine(it, Icons.Rounded.Check, Gradients.Emerald, tile = 26.dp, style = MaterialTheme.typography.bodyMedium) }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PillButton("Разрешить", modifier = Modifier.weight(1f), icon = Icons.Rounded.Check) {
                 scope.launch { graph.guardian.decide(req, approved = true) }
@@ -263,6 +269,7 @@ private fun requestVisual(kind: RequestKind?): Visual = when (kind) {
     RequestKind.SITE_UNBLOCK -> Visual(Icons.Rounded.Language, Gradients.Violet)
     RequestKind.PROTECTION_CHANGE -> Visual(Icons.Rounded.GppMaybe, Gradients.Danger)
     RequestKind.REMOTE_ACCESS -> Visual(Icons.AutoMirrored.Rounded.ScreenShare, Gradients.Danger)
+    RequestKind.TRUST_LEVEL -> Visual(Icons.Rounded.Stairs, Gradients.Emerald)
     null -> Visual(Icons.AutoMirrored.Rounded.HelpOutline, Gradients.Slate)
 }
 

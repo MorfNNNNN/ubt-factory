@@ -81,6 +81,7 @@ import ru.ubt.familyshield.ui.components.StatusDot
 import ru.ubt.familyshield.ui.components.gradient
 import ru.ubt.familyshield.ui.components.relativeTime
 import ru.ubt.familyshield.ui.components.visual
+import ru.ubt.familyshield.ui.calendar.CalendarHomeCard
 import ru.ubt.familyshield.ui.invite.InviteScreen
 import ru.ubt.familyshield.ui.safety.GosProtectionsScreen
 import ru.ubt.familyshield.ui.safety.SafetySchoolScreen
@@ -90,7 +91,6 @@ import ru.ubt.familyshield.ui.theme.Brand
 import ru.ubt.familyshield.ui.theme.Gradients
 
 private val URGENT = setOf("CRITICAL", "HIGH")
-private const val WEEK_MILLIS = 7 * 86_400_000L
 
 @Composable
 fun GuardianDashboard(
@@ -100,6 +100,8 @@ fun GuardianDashboard(
     onOpenMember: (String) -> Unit,
     onGoAlerts: () -> Unit,
     onOpenSettings: () -> Unit = {},
+    onOpenWeek: () -> Unit = {},
+    onOpenCalendar: () -> Unit = {},
 ) {
     var showInvite by remember { mutableStateOf(false) }
     var paywall by remember { mutableStateOf<UpsellReason?>(null) }
@@ -148,9 +150,11 @@ fun GuardianDashboard(
             else -> CalmHero(state.protectedMembers)
         }
 
-        if (state.protectedMembers.isNotEmpty()) StatsRow(state, onOpenMember, onGoAlerts)
+        if (state.protectedMembers.isNotEmpty()) StatsRow(graph, state, onOpenMember, onGoAlerts)
 
         if (state.pendingRequests.isNotEmpty()) RequestsCard(state, onGoAlerts)
+
+        if (state.protectedMembers.isNotEmpty()) CalendarHomeCard(graph, state, onOpenCalendar)
 
         Campaigns.active()?.let { CampaignCard(it, ::onCampaign) }
 
@@ -165,7 +169,7 @@ fun GuardianDashboard(
                 MemberCard(state, member) { onOpenMember(member.deviceId) }
             }
             AddPhoneCard("Добавить ещё телефон", "Ребёнка, родителя или второго взрослого") { showInvite = true }
-            WeekCard(state)
+            WeekCard(graph, state, onOpenWeek)
         }
 
         if (graph.entitlements.tier == ru.ubt.familyshield.shared.billing.Tier.FREE) {
@@ -261,14 +265,15 @@ private fun InviteHero(onAdd: () -> Unit) {
 private class Stat(val value: String, val label: String, val visual: ru.ubt.familyshield.ui.components.Visual, val onClick: () -> Unit)
 
 @Composable
-private fun StatsRow(state: FamilyUiState, onOpenMember: (String) -> Unit, onGoAlerts: () -> Unit) {
-    val since = System.currentTimeMillis() - WEEK_MILLIS
+private fun StatsRow(graph: AppGraph, state: FamilyUiState, onOpenMember: (String) -> Unit, onGoAlerts: () -> Unit) {
+    val week = ru.ubt.familyshield.shared.content.WeekNumbers.of(
+        rememberWeekStats(graph).within(ru.ubt.familyshield.shared.content.WeeklyDigest.thisWeek(java.time.LocalDate.now())),
+    )
     val child = state.protectedMembers.firstOrNull { it.memberRole == MemberRole.CHILD }
     val elder = state.protectedMembers.firstOrNull { it.memberRole == MemberRole.ELDER }
     val stats = buildList {
         if (elder != null) {
-            val blocked = state.alerts.count { it.type == AlertType.SCAM_CALL_BLOCKED.name && it.createdAt >= since }
-            add(Stat(blocked.toString(), "Звонков мошенников отбито за неделю", FeatureIcons.Calls, onGoAlerts))
+            add(Stat(week.scamCalls.toString(), "Звонков мошенников отбито за неделю", FeatureIcons.Calls, onGoAlerts))
         }
         if (child != null) {
             add(Stat(child.todayMinutes?.let { formatMinutes(it) } ?: "—", "${child.displayName} сегодня в телефоне", FeatureIcons.ScreenTime) { onOpenMember(child.deviceId) })
@@ -277,8 +282,7 @@ private fun StatsRow(state: FamilyUiState, onOpenMember: (String) -> Unit, onGoA
             add(Stat(elder.lastCheckInAt?.let { relativeTime(it) } ?: "—", "Последнее «Я в порядке»", AlertType.CHECK_IN_OK.visual()) { onOpenMember(elder.deviceId) })
         }
         if (child != null && elder == null) {
-            val sites = state.alerts.count { it.type == AlertType.BLOCKED_SITE.name && it.createdAt >= since }
-            add(Stat(sites.toString(), "Опасных сайтов закрыто за неделю", FeatureIcons.Web, onGoAlerts))
+            add(Stat(week.sitesBlocked.toString(), "Опасных сайтов закрыто за неделю", FeatureIcons.Web, onGoAlerts))
         }
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -449,11 +453,12 @@ fun roleColor(role: MemberRole) = when (role) {
 fun requestSummary(req: ru.ubt.familyshield.core.db.RequestEntity): String {
     val r = runCatching { ru.ubt.familyshield.shared.ShieldJson.decodeFromString(ru.ubt.familyshield.shared.model.MemberRequest.serializer(), req.json) }.getOrNull()
     return when (r?.kind) {
-        ru.ubt.familyshield.shared.model.RequestKind.MORE_TIME -> "просит ещё ${r.minutes ?: 15} мин"
+        ru.ubt.familyshield.shared.model.RequestKind.MORE_TIME -> "просит ещё ${r.minutes ?: 15}\u00A0мин"
         ru.ubt.familyshield.shared.model.RequestKind.APP_APPROVAL -> "хочет «${r.appLabel ?: r.packageName}»"
         ru.ubt.familyshield.shared.model.RequestKind.SITE_UNBLOCK -> "просит сайт ${r.domain}"
         ru.ubt.familyshield.shared.model.RequestKind.PROTECTION_CHANGE -> "хочет отключить защиту"
         ru.ubt.familyshield.shared.model.RequestKind.REMOTE_ACCESS -> "хочет открыть «${r.appLabel ?: r.packageName}» (удалённый доступ)"
+        ru.ubt.familyshield.shared.model.RequestKind.TRUST_LEVEL -> "просит уровень доверия «${r.level?.title ?: "выше"}»"
         null -> "запрос"
     }
 }

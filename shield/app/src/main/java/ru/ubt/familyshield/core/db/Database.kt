@@ -12,6 +12,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.Transaction
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -373,15 +374,89 @@ interface ChangeDao {
     suspend fun clear()
 }
 
+/** «Неделя семьи»: per-day counters that outlive the plan's history limit (metric names: see WeekMetric). */
+@Entity(tableName = "daily_stats", primaryKeys = ["date", "deviceId", "metric"])
+data class DailyStatEntity(
+    val date: String,
+    val deviceId: String,
+    val metric: String,
+    val value: Int,
+)
+
+@Dao
+abstract class StatDao {
+    @Query("SELECT * FROM daily_stats WHERE date >= :from")
+    abstract fun observeSince(from: String): Flow<List<DailyStatEntity>>
+
+    @Query("SELECT * FROM daily_stats WHERE date >= :from AND date <= :to")
+    abstract suspend fun between(from: String, to: String): List<DailyStatEntity>
+
+    @Query("INSERT OR IGNORE INTO daily_stats (date, deviceId, metric, value) VALUES (:date, :deviceId, :metric, 0)")
+    protected abstract suspend fun ensure(date: String, deviceId: String, metric: String)
+
+    @Query("UPDATE daily_stats SET value = value + :by WHERE date = :date AND deviceId = :deviceId AND metric = :metric")
+    protected abstract suspend fun increase(date: String, deviceId: String, metric: String, by: Int)
+
+    /** Adds [by] to a counter (SQLite on API 26 has no UPSERT clause, hence two statements). */
+    @Transaction
+    open suspend fun add(date: String, deviceId: String, metric: String, by: Int = 1) {
+        ensure(date, deviceId, metric)
+        increase(date, deviceId, metric, by)
+    }
+
+    /** Replaces a value that is reported whole, like today's screen minutes. */
+    @Upsert
+    abstract suspend fun put(stat: DailyStatEntity)
+
+    @Query("DELETE FROM daily_stats WHERE date < :before")
+    abstract suspend fun deleteOlderThan(before: String)
+
+    @Query("DELETE FROM daily_stats")
+    abstract suspend fun clear()
+}
+
+/** «Семейный календарь»: [json] holds the full FamilyEvent, the other columns serve queries and cleanup. */
+@Entity(tableName = "calendar", indices = [Index("startsAt")])
+data class CalendarEntity(
+    @PrimaryKey val id: String,
+    val startsAt: Long,
+    val repeating: Boolean,
+    val updatedAt: Long,
+    val deleted: Boolean,
+    val json: String,
+)
+
+@Dao
+interface CalendarDao {
+    @Query("SELECT * FROM calendar WHERE deleted = 0 ORDER BY startsAt ASC")
+    fun observeAll(): Flow<List<CalendarEntity>>
+
+    @Query("SELECT * FROM calendar WHERE deleted = 0")
+    suspend fun all(): List<CalendarEntity>
+
+    @Query("SELECT * FROM calendar WHERE id = :id")
+    suspend fun get(id: String): CalendarEntity?
+
+    @Upsert
+    suspend fun upsert(event: CalendarEntity)
+
+    /** Removed events and one-off events that are long over. */
+    @Query("DELETE FROM calendar WHERE (deleted = 1 AND updatedAt < :before) OR (repeating = 0 AND startsAt < :before)")
+    suspend fun deleteStale(before: Long)
+
+    @Query("DELETE FROM calendar")
+    suspend fun clear()
+}
+
 @Database(
     entities = [
         MemberEntity::class, AlertEntity::class, LocationEntity::class, UsageEntity::class, RequestEntity::class,
         NoteEntity::class, OutboxEntity::class, EventEntity::class, ThreatNumberEntity::class, TaskEntity::class,
-        ChangeEntity::class,
+        ChangeEntity::class, DailyStatEntity::class, CalendarEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
 )
 abstract class ShieldDatabase : RoomDatabase() {
     abstract fun members(): MemberDao
@@ -395,6 +470,8 @@ abstract class ShieldDatabase : RoomDatabase() {
     abstract fun threatNumbers(): ThreatNumberDao
     abstract fun tasks(): TaskDao
     abstract fun changes(): ChangeDao
+    abstract fun stats(): StatDao
+    abstract fun calendar(): CalendarDao
 
     suspend fun clearFamilyData() {
         members().clear()
@@ -406,6 +483,8 @@ abstract class ShieldDatabase : RoomDatabase() {
         outbox().clear()
         tasks().clear()
         changes().clear()
+        stats().clear()
+        calendar().clear()
     }
 
     companion object {

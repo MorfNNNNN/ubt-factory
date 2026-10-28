@@ -19,6 +19,8 @@ import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.automirrored.rounded.ManageSearch
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.AccountBalance
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
@@ -74,7 +76,7 @@ import ru.ubt.familyshield.ui.safety.SafetySchoolScreen
 private enum class SettingsScreen { MAIN, CHECKER, SCHOOL, GOS, PRIVACY, TERMS, HELP }
 
 @Composable
-fun GuardianSettings(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState) {
+fun GuardianSettings(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState, onOpenWeek: () -> Unit = {}, onOpenCalendar: () -> Unit = {}) {
     var screen by remember { mutableStateOf(SettingsScreen.MAIN) }
     var paywall by remember { mutableStateOf(false) }
     when (screen) {
@@ -148,6 +150,14 @@ fun GuardianSettings(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState)
         }
 
         GroupCard(title = "Инструменты") {
+            TileRow(
+                "Семейный календарь", subtitle = "Кто кого забирает, кружки, врачи, дни рождения",
+                icon = Icons.Rounded.CalendarMonth, gradient = Gradients.Sky, onClick = onOpenCalendar,
+            )
+            TileRow(
+                "Неделя семьи", subtitle = "Итоги за 7 дней: звонки, отметки, задания",
+                icon = Icons.Rounded.Insights, gradient = Gradients.Emerald, onClick = onOpenWeek,
+            )
             TileRow(
                 "Проверить номер, ссылку, сообщение", subtitle = "Подскажем, не мошенники ли это",
                 icon = Icons.AutoMirrored.Rounded.ManageSearch, gradient = Gradients.Violet,

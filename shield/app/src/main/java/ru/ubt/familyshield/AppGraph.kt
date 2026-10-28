@@ -4,6 +4,7 @@ import android.app.Application
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import ru.ubt.familyshield.core.billing.BillingManager
 import ru.ubt.familyshield.core.billing.EntitlementRepository
 import ru.ubt.familyshield.core.db.ShieldDatabase
@@ -48,7 +49,11 @@ class AppGraph(val app: Application, box: SecretBox = KeystoreSecretBox()) {
     val family: FamilyRepository by lazy { FamilyRepository(settings, api, db, secretBox, { signer }, { sync }) }
     val guardian: ru.ubt.familyshield.core.family.GuardianActions by lazy { ru.ubt.familyshield.core.family.GuardianActions(settings, db, { sync }) }
     val actions: ru.ubt.familyshield.core.family.FamilyActions by lazy { ru.ubt.familyshield.core.family.FamilyActions(settings, db, { sync }) }
-    val handler: MessageHandler by lazy { MessageHandler(settings, db, family, notifier, secretBox, { sync }, { protection.controller }) }
+    val week: ru.ubt.familyshield.core.family.FamilyWeek by lazy { ru.ubt.familyshield.core.family.FamilyWeek(settings, db, notifier) }
+    val calendar: ru.ubt.familyshield.core.family.FamilyCalendar by lazy { ru.ubt.familyshield.core.family.FamilyCalendar(app, settings, db, notifier, { sync }) }
+    val handler: MessageHandler by lazy {
+        MessageHandler(settings, db, family, notifier, secretBox, { sync }, { protection.controller }, { week }, { calendar })
+    }
     val entitlements: EntitlementRepository by lazy { EntitlementRepository(settings, api, appScope) }
     val billing: BillingManager by lazy { BillingManager(settings, api, entitlements) }
     val threats: ThreatRepository by lazy { ThreatRepository(app, db, api, settings) }
@@ -61,6 +66,7 @@ class AppGraph(val app: Application, box: SecretBox = KeystoreSecretBox()) {
     fun scheduleWork() {
         SyncWorker.schedule(app)
         MaintenanceWorker.schedule(app)
+        appScope.launch { runCatching { calendar.reschedule() } }
     }
 
     suspend fun registerPushToken(token: String) {
@@ -71,18 +77,21 @@ class AppGraph(val app: Application, box: SecretBox = KeystoreSecretBox()) {
     /** Called after each periodic sync: keeps guardians' view fresh even if the foreground service was killed. */
     suspend fun onPeriodicTick() {
         val s = settings.current
+        runCatching { week.maybeNotify() }
         if (!s.isPaired || s.role == MemberRole.GUARDIAN) return
         if (System.currentTimeMillis() - s.lastStatusAt > 14 * 60_000L) runCatching { protection.reporter.sendStatus() }
         protection.apply()
     }
 
     /** Elder taps "Я в порядке". */
-    suspend fun checkIn() {
+    /** [answered]: a reply to «Отметься», which guardians are notified about (daily check-ins stay quiet). */
+    suspend fun checkIn(answered: Boolean = false) {
         val now = System.currentTimeMillis()
         settings.setLastCheckInAt(now)
         notifier.cancel(Notifier.ID_CHECK_IN)
         val p = protection.location.lastKnown()?.let { GeoPoint(it.latitude, it.longitude) }
-        sync.send(FamilyPayload.CheckInDone(CheckIn(UUID.randomUUID().toString(), now, location = p)), Audience.GUARDIANS, urgent = true)
+        val mood = if (answered) CheckIn.MOOD_ANSWERED else "ok"
+        sync.send(FamilyPayload.CheckInDone(CheckIn(UUID.randomUUID().toString(), now, mood = mood, location = p)), Audience.GUARDIANS, urgent = true)
         protection.alerts.journal("CHECK_IN", "Отметка «Я в порядке»")
     }
 
@@ -94,5 +103,8 @@ class AppGraph(val app: Application, box: SecretBox = KeystoreSecretBox()) {
         db.locations().deleteOlderThan(cutoff)
         db.events().deleteOlderThan(System.currentTimeMillis() - 30 * 86_400_000L)
         db.usage().deleteOlderThan(LocalDate.now().minusDays(days).toString())
+        // «Неделя семьи» keeps its counters regardless of the plan: two weeks are compared, eight are kept.
+        db.stats().deleteOlderThan(LocalDate.now().minusDays(56).toString())
+        db.calendar().deleteStale(System.currentTimeMillis() - 30 * 86_400_000L)
     }
 }

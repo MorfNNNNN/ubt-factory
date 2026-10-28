@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.ChildCare
 import androidx.compose.material.icons.rounded.Elderly
@@ -14,8 +15,10 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.GppMaybe
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Phone
+import androidx.compose.material.icons.rounded.PhoneDisabled
 import androidx.compose.material.icons.rounded.School
 import androidx.compose.material.icons.rounded.TaskAlt
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,13 +28,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import ru.ubt.familyshield.AppGraph
 import ru.ubt.familyshield.core.family.childPolicy
 import ru.ubt.familyshield.core.family.elderPolicy
 import ru.ubt.familyshield.core.family.memberRole
 import ru.ubt.familyshield.shared.content.Campaign
 import ru.ubt.familyshield.shared.content.CampaignAction
-import ru.ubt.familyshield.shared.content.SafetySchool
-import ru.ubt.familyshield.shared.model.AlertType
+import ru.ubt.familyshield.shared.content.WeekNumbers
+import ru.ubt.familyshield.shared.content.WeeklyDigest
 import ru.ubt.familyshield.shared.model.MemberRole
 import ru.ubt.familyshield.ui.FamilyUiState
 import ru.ubt.familyshield.ui.components.Art3D
@@ -40,7 +44,6 @@ import ru.ubt.familyshield.ui.components.Illustration
 import ru.ubt.familyshield.ui.components.ProgressRing
 import ru.ubt.familyshield.ui.components.SoftCard
 import ru.ubt.familyshield.ui.components.TileRow
-import ru.ubt.familyshield.ui.safety.learning
 import ru.ubt.familyshield.ui.theme.Brand
 import ru.ubt.familyshield.ui.theme.Gradients
 
@@ -137,32 +140,26 @@ internal fun SetupChecklist(progress: Map<SetupStep, Boolean>, onStep: (SetupSte
 
 // ---- Week of the family ------------------------------------------------------------------------------
 
-private const val WEEK = 7 * 86_400_000L
-
 @Composable
-internal fun WeekCard(state: FamilyUiState) {
-    val since = System.currentTimeMillis() - WEEK
-    val week = state.alerts.filter { it.createdAt >= since }
-    val dangerous = week.count { it.severity == "CRITICAL" || it.severity == "HIGH" }
-    val checkIns = week.count { it.type == AlertType.CHECK_IN_OK.name }
-    val tasks = week.count { it.type == AlertType.TASK_DONE.name }
-    val lessons = (state.others.map { it.learning() } + state.settings.learning)
-        .sumOf { p -> SafetySchool.lessons.count { p.passed(it.id) } }
-    SoftCard(padding = 16.dp) {
+internal fun WeekCard(graph: AppGraph, state: FamilyUiState, onOpen: () -> Unit) {
+    val today = java.time.LocalDate.now()
+    val week = WeekNumbers.of(rememberWeekStats(graph).within(WeeklyDigest.thisWeek(today)))
+    SoftCard(onClick = onOpen, padding = 16.dp) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Illustration(Art3D.Calendar, size = 44.dp)
             Column(Modifier.weight(1f)) {
                 Text("Неделя семьи", style = MaterialTheme.typography.titleMedium)
-                Text("Что произошло за 7 дней", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(weekRangeLabel(today), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Открыть итоги недели", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            WeekStat("$dangerous", "опасных ${plural(dangerous, "момент", "момента", "моментов")} замечено", Icons.Rounded.GppMaybe, Gradients.Sunrise)
-            WeekStat("$checkIns", "${plural(checkIns, "отметка", "отметки", "отметок")} «Я в порядке»", Icons.Rounded.Favorite, Gradients.Coral)
+            WeekStat("${week.dangerous}", "опасных ${plural(week.dangerous, "момент", "момента", "моментов")}", Icons.Rounded.GppMaybe, Gradients.Sunrise)
+            WeekStat("${week.scamCalls}", "${plural(week.scamCalls, "звонок", "звонка", "звонков")} мошенников", Icons.Rounded.PhoneDisabled, Gradients.Danger)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            WeekStat("$tasks", "${plural(tasks, "задание выполнено", "задания выполнено", "заданий выполнено")}", Icons.Rounded.TaskAlt, Gradients.Emerald)
-            WeekStat("$lessons", "${plural(lessons, "урок пройден", "урока пройдено", "уроков пройдено")} семьёй", Icons.Rounded.School, Gradients.Violet)
+            WeekStat("${week.checkIns}", "${plural(week.checkIns, "отметка", "отметки", "отметок")} «Я в порядке»", Icons.Rounded.Favorite, Gradients.Coral)
+            WeekStat("${week.tasksDone}", plural(week.tasksDone, "задание", "задания", "заданий"), Icons.Rounded.TaskAlt, Gradients.Emerald)
         }
     }
 }

@@ -1,5 +1,6 @@
 package ru.ubt.familyshield.protect
 
+import ru.ubt.familyshield.shared.model.withTrust
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
@@ -121,7 +122,7 @@ class ProtectionCenter(
         if (minute % 30 == 0L) runCatching { reporter.sendUsage() }
         if (minute % 360 == 5L) runCatching { reporter.sendInventoryIfChanged() }
         val interval = when (s.role) {
-            MemberRole.CHILD -> s.childPolicy.locationIntervalMinutes
+            MemberRole.CHILD -> s.childPolicy.withTrust().locationIntervalMinutes
             else -> s.elderPolicy.locationIntervalMinutes
         }.coerceAtLeast(5)
         if (minute % interval == 0L && entitlements.has(Feature.LIVE_LOCATION)) {
@@ -229,6 +230,7 @@ class ProtectionCenter(
                 is Command.ApproveProtectionChange -> settings.current.protectionChange?.takeIf { it.id == command.requestId }?.let {
                     settings.setProtectionChange(it.copy(approvedByGuardian = true))
                 }
+                is Command.AskCheckIn -> reminders.onCheckInAsked(command.fromName)
                 is Command.RequestReport -> {
                     reporter.sendStatus()
                     reporter.sendUsage()

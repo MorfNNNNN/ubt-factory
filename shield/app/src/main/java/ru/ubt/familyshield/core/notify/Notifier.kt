@@ -27,12 +27,14 @@ class Notifier(private val context: Context) {
         const val CH_WARNINGS = "warnings"
         const val CH_PROTECTION = "protection"
         const val CH_INFO = "info"
+        const val CH_DIGEST = "digest"
 
         const val EXTRA_ROUTE = "route"
         const val ID_FOREGROUND = 1001
         const val ID_WARNING = 1002
         const val ID_CHECK_IN = 1003
         const val ID_LIMIT = 1004
+        const val ID_DIGEST = 1005
 
         private const val MAIN_ACTIVITY = "ru.ubt.familyshield.ui.MainActivity"
     }
@@ -58,10 +60,11 @@ class Notifier(private val context: Context) {
                 channel(CH_ALERTS, "Оповещения о близких", NotificationManager.IMPORTANCE_HIGH, "Подозрительные сообщения, новые приложения, геозоны"),
                 channel(CH_REQUESTS, "Запросы от детей", NotificationManager.IMPORTANCE_DEFAULT, "Просьбы о дополнительном времени и новых приложениях"),
                 channel(CH_CHAT, "Семейный чат", NotificationManager.IMPORTANCE_DEFAULT, "Сообщения от членов семьи"),
-                channel(CH_REMINDERS, "Напоминания", NotificationManager.IMPORTANCE_HIGH, "Лекарства и ежедневная отметка «Я в порядке»"),
+                channel(CH_REMINDERS, "Напоминания", NotificationManager.IMPORTANCE_HIGH, "Лекарства, отметка «Я в порядке» и дела из семейного календаря"),
                 channel(CH_WARNINGS, "Предупреждения о мошенничестве", NotificationManager.IMPORTANCE_HIGH, "Предупреждения на этом телефоне"),
                 channel(CH_PROTECTION, "Фоновая защита", NotificationManager.IMPORTANCE_LOW, "Постоянное уведомление о работе защиты", vibrate = false),
                 channel(CH_INFO, "Прочее", NotificationManager.IMPORTANCE_LOW, "Сводки и служебные сообщения", vibrate = false),
+                channel(CH_DIGEST, "Неделя семьи", NotificationManager.IMPORTANCE_DEFAULT, "Итоги недели по воскресеньям", vibrate = false),
             ),
         )
     }
@@ -127,6 +130,10 @@ class Notifier(private val context: Context) {
 
     fun info(id: Int, title: String, text: String, route: String? = null) =
         post(id, base(CH_INFO, title, text).setContentIntent(openAppIntent(route, id)))
+
+    /** «Неделя семьи» on Sunday evening; opens the weekly report. */
+    fun digest(title: String, text: String) =
+        post(ID_DIGEST, base(CH_DIGEST, title, text).setContentIntent(openAppIntent("week", ID_DIGEST)).setCategory(NotificationCompat.CATEGORY_RECOMMENDATION))
 
     fun cancel(id: Int) = manager.cancel(id)
 

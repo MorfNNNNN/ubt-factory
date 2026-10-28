@@ -75,6 +75,7 @@ import ru.ubt.familyshield.shared.model.TrustedContact
 import ru.ubt.familyshield.shared.policy.formatMinuteOfDay
 import ru.ubt.familyshield.ui.FamilyUiState
 import ru.ubt.familyshield.ui.ShieldViewModel
+import ru.ubt.familyshield.ui.calendar.MyDayCard
 import ru.ubt.familyshield.ui.components.Art3D
 import ru.ubt.familyshield.ui.components.ArtTile
 import ru.ubt.familyshield.ui.components.AvatarImage
@@ -149,6 +150,7 @@ fun ElderHome(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState, activi
             CheckInTile(state.settings.lastCheckInAt, Modifier.weight(1f).fillMaxHeight()) { scope.launch { graph.checkIn() } }
             CallFamilyTile(family, Modifier.weight(1f).fillMaxHeight()) { dial(family?.phone) ?: run { screen = "settings" } }
         }
+        MyDayCard(graph, large = true)
         AppRow(apps[0], apps[1])
         CheckerTile { screen = "checker" }
         LearnTile(Art3D.Notebook, "Уроки безопасности", schoolHint(state.settings.learning)) { screen = "school" }

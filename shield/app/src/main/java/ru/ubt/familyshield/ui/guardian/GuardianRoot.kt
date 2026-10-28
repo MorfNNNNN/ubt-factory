@@ -30,6 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -45,7 +46,11 @@ import androidx.compose.ui.unit.dp
 import ru.ubt.familyshield.AppGraph
 import ru.ubt.familyshield.ui.FamilyUiState
 import ru.ubt.familyshield.ui.ShieldViewModel
+import ru.ubt.familyshield.ui.calendar.FamilyCalendarScreen
 import ru.ubt.familyshield.ui.chat.FamilyChatScreen
+import ru.ubt.familyshield.ui.paywall.PaywallScreen
+import ru.ubt.familyshield.ui.paywall.UpsellReason
+import ru.ubt.familyshield.ui.safety.SafetySchoolScreen
 import ru.ubt.familyshield.ui.theme.Brand
 
 private enum class Tab(val label: String, val on: ImageVector, val off: ImageVector) {
@@ -55,10 +60,50 @@ private enum class Tab(val label: String, val on: ImageVector, val off: ImageVec
     SETTINGS("Ещё", Icons.Rounded.Settings, Icons.Outlined.Settings),
 }
 
+/** Full-screen pages opened over the tabs: from home cards, settings rows and notifications. */
+private object Page {
+    const val WEEK = "week"
+    const val CALENDAR = "calendar"
+    const val PREMIUM = "premium"
+    const val LESSON = "lesson:"
+}
+
 @Composable
-fun GuardianRoot(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState) {
+fun GuardianRoot(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState, deepLink: String? = null, onDeepLinkHandled: () -> Unit = {}) {
     var tab by rememberSaveable { mutableStateOf(Tab.FAMILY) }
     var openMember by rememberSaveable { mutableStateOf<String?>(null) }
+    var page by rememberSaveable { mutableStateOf<String?>(null) }
+
+    // Notifications open the place they talk about.
+    LaunchedEffect(deepLink) {
+        when (deepLink ?: return@LaunchedEffect) {
+            "alerts", "requests" -> tab = Tab.ALERTS
+            "chat" -> tab = Tab.CHAT
+            Page.WEEK, Page.CALENDAR -> {
+                openMember = null
+                page = deepLink
+            }
+        }
+        onDeepLinkHandled()
+    }
+
+    when (val p = page) {
+        Page.WEEK -> {
+            WeekReportScreen(
+                graph, state, onBack = { page = null },
+                onOpenMember = { page = null; openMember = it },
+                onLesson = { page = Page.LESSON + it },
+                onPremium = { page = Page.PREMIUM },
+            )
+            return
+        }
+        Page.CALENDAR -> { FamilyCalendarScreen(graph, state) { page = null }; return }
+        Page.PREMIUM -> { PaywallScreen(graph, UpsellReason.GENERAL) { page = Page.WEEK }; return }
+        else -> if (p != null && p.startsWith(Page.LESSON)) {
+            SafetySchoolScreen(graph, p.removePrefix(Page.LESSON).ifBlank { null }) { page = Page.WEEK }
+            return
+        }
+    }
 
     val memberId = openMember
     if (memberId != null) {
@@ -90,10 +135,13 @@ fun GuardianRoot(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState) {
         // Consume the bars here so nested screens (and their own scaffolds) don't pad for them twice.
         Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
             when (tab) {
-                Tab.FAMILY -> GuardianDashboard(graph, vm, state, onOpenMember = { openMember = it }, onGoAlerts = { tab = Tab.ALERTS }, onOpenSettings = { tab = Tab.SETTINGS })
+                Tab.FAMILY -> GuardianDashboard(
+                    graph, vm, state, onOpenMember = { openMember = it }, onGoAlerts = { tab = Tab.ALERTS }, onOpenSettings = { tab = Tab.SETTINGS },
+                    onOpenWeek = { page = Page.WEEK }, onOpenCalendar = { page = Page.CALENDAR },
+                )
                 Tab.ALERTS -> AlertsScreen(graph, vm, state, onOpenMember = { openMember = it })
                 Tab.CHAT -> FamilyChatScreen(graph, state, embedded = true)
-                Tab.SETTINGS -> GuardianSettings(graph, vm, state)
+                Tab.SETTINGS -> GuardianSettings(graph, vm, state, onOpenWeek = { page = Page.WEEK }, onOpenCalendar = { page = Page.CALENDAR })
             }
         }
     }
