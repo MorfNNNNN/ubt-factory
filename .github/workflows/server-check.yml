@@ -1,0 +1,47 @@
+name: family-shield-server-check
+
+# Read-only reachability check of the production server from GitHub's network: SSH banner, open
+# ports, DNS delegation and HTTPS. Needs no secrets; run it before relying on the deploy job.
+on:
+  push:
+    branches: [main, claude/cool-gates-wyu9vs]
+    paths: [".github/workflows/server-check.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SERVER_HOST: ${{ vars.SERVER_HOST || '188.120.246.123' }}
+      SHIELD_DOMAIN: ${{ vars.SHIELD_DOMAIN || 'familyapp1.ru' }}
+    steps:
+      - name: SSH banner
+        run: |
+          for attempt in 1 2 3 4 5; do
+            banner=$(timeout 25 bash -c "exec 3<>/dev/tcp/$SERVER_HOST/22 && timeout 20 head -c 64 <&3" 2>&1 || true)
+            echo "attempt $attempt: ${banner:-<connected, no banner>}"
+            case "$banner" in SSH-*) echo "SSH answers: $banner" >> "$GITHUB_STEP_SUMMARY"; exit 0 ;; esac
+            sleep 10
+          done
+          echo "SSH: no banner from $SERVER_HOST:22" >> "$GITHUB_STEP_SUMMARY"
+      - name: Ports 80 and 443
+        run: |
+          for port in 80 443; do
+            if timeout 10 bash -c "exec 3<>/dev/tcp/$SERVER_HOST/$port"; then echo "port $port: open"; else echo "port $port: closed or filtered"; fi
+          done
+          curl -sS -m 10 -o /dev/null -w "http://$SERVER_HOST/health: %{http_code}\n" "http://$SERVER_HOST/health" || true
+      - name: DNS
+        run: |
+          echo "NS:  $(dig +short NS "$SHIELD_DOMAIN" | tr '\n' ' ')"
+          echo "A:   $(dig +short A "$SHIELD_DOMAIN" | tr '\n' ' ')"
+          for ns in ns1.firstvds.ru ns2.firstvds.ru; do
+            echo "--- $ns"
+            dig @"$ns" "$SHIELD_DOMAIN" SOA +norecurse +time=5 +tries=1 | grep -E 'status:|SOA|flags:' || true
+          done
+          curl -sS -m 10 "https://$SHIELD_DOMAIN/health" || true
+      - name: Route to port 22
+        run: sudo traceroute -T -p 22 -n -q 1 -w 2 -m 25 "$SERVER_HOST" || true
