@@ -2,11 +2,24 @@ package ru.ubt.familyshield.ui.guardian
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.InstallMobile
+import androidx.compose.material.icons.rounded.MarkChatUnread
+import androidx.compose.material.icons.rounded.PhonelinkLock
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Today
+import androidx.compose.material.icons.rounded.TravelExplore
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Weekend
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -14,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import ru.ubt.familyshield.AppGraph
@@ -27,14 +41,13 @@ import ru.ubt.familyshield.shared.model.ScheduleRule
 import ru.ubt.familyshield.shared.model.TimeWindow
 import ru.ubt.familyshield.shared.model.WebCategory
 import ru.ubt.familyshield.shared.policy.formatMinuteOfDay
-import ru.ubt.familyshield.ui.components.Gap
-import ru.ubt.familyshield.ui.components.PrimaryButton
-import ru.ubt.familyshield.ui.components.ScreenScaffold
-import ru.ubt.familyshield.ui.components.SectionCard
-import ru.ubt.familyshield.ui.components.SliderRow
-import ru.ubt.familyshield.ui.components.ToggleRow
+import ru.ubt.familyshield.ui.components.AvatarImage
+import ru.ubt.familyshield.ui.components.FeatureIcons
+import ru.ubt.familyshield.ui.components.Visual
 import ru.ubt.familyshield.ui.paywall.PaywallScreen
 import ru.ubt.familyshield.ui.paywall.UpsellReason
+import ru.ubt.familyshield.ui.theme.Brand
+import ru.ubt.familyshield.ui.theme.Gradients
 
 @Composable
 fun ChildControls(graph: AppGraph, member: MemberEntity, onBack: () -> Unit) {
@@ -50,39 +63,57 @@ fun ChildControls(graph: AppGraph, member: MemberEntity, onBack: () -> Unit) {
         if (graph.entitlements.has(feature)) apply() else paywall = reason
     }
 
-    ScreenScaffold(title = "Правила: ${member.displayName}", onBack = onBack) { padding ->
-        Column(Modifier.padding(padding).padding(horizontal = 16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-
-            SectionCard(title = "Экранное время") {
+    DetailScaffold(
+        title = "Правила: ${member.displayName}",
+        onBack = onBack,
+        actions = { AvatarImage(member.avatar, member.role, 42.dp) },
+    ) { padding ->
+        Column(
+            Modifier.padding(padding).padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            GroupCard(title = "Экранное время") {
                 if (!premium) {
-                    ToggleRow("Дневной лимит", "Ограничить время в развлекательных приложениях", checked = false, locked = true) { paywall = UpsellReason.KIDS }
+                    IconToggleRow(
+                        "Дневной лимит", Icons.Rounded.Today, Gradients.Sky, checked = false,
+                        subtitle = "Ограничить время в развлекательных приложениях", locked = true,
+                    ) { paywall = UpsellReason.KIDS }
                 } else {
                     val weekday = policy.dailyLimitWeekdayMinutes ?: 0
-                    ToggleRow("Дневной лимит по будням", checked = policy.dailyLimitWeekdayMinutes != null) { on ->
+                    IconToggleRow("Дневной лимит по будням", Icons.Rounded.Today, Gradients.Sky, checked = policy.dailyLimitWeekdayMinutes != null) { on ->
                         update { it.copy(dailyLimitWeekdayMinutes = if (on) 120 else null) }
                     }
                     if (policy.dailyLimitWeekdayMinutes != null) {
-                        SliderRow("Будни", weekday, 30..360, 15, { ru.ubt.familyshield.shared.policy.formatMinutes(it) }) { v -> update { it.copy(dailyLimitWeekdayMinutes = v) } }
+                        LimitSliderRow("Будни", weekday, 30..360, 15, { ru.ubt.familyshield.shared.policy.formatMinutes(it) }) { v -> update { it.copy(dailyLimitWeekdayMinutes = v) } }
                     }
                     val weekend = policy.dailyLimitWeekendMinutes ?: 0
-                    ToggleRow("Дневной лимит по выходным", checked = policy.dailyLimitWeekendMinutes != null) { on ->
+                    IconToggleRow("Дневной лимит по выходным", Icons.Rounded.Weekend, Gradients.Sunrise, checked = policy.dailyLimitWeekendMinutes != null) { on ->
                         update { it.copy(dailyLimitWeekendMinutes = if (on) 180 else null) }
                     }
                     if (policy.dailyLimitWeekendMinutes != null) {
-                        SliderRow("Выходные", weekend, 30..480, 15, { ru.ubt.familyshield.shared.policy.formatMinutes(it) }) { v -> update { it.copy(dailyLimitWeekendMinutes = v) } }
+                        LimitSliderRow("Выходные", weekend, 30..480, 15, { ru.ubt.familyshield.shared.policy.formatMinutes(it) }) { v -> update { it.copy(dailyLimitWeekendMinutes = v) } }
                     }
                 }
             }
 
-            SectionCard(title = "Расписания", subtitle = "Когда доступны только звонки и важные приложения") {
+            GroupCard(title = "Расписания", subtitle = "Когда доступны только звонки и важные приложения") {
                 policy.schedules.forEach { s ->
-                    ToggleRow(scheduleLabel(s), "${formatMinuteOfDay(s.window.startMinute)}–${formatMinuteOfDay(s.window.endMinute)}", checked = s.enabled, locked = !premium && s.id != "sleep") { on ->
+                    val v = scheduleVisual(s)
+                    IconToggleRow(
+                        scheduleLabel(s), v.icon, v.gradient, checked = s.enabled,
+                        subtitle = "${formatMinuteOfDay(s.window.startMinute)}–${formatMinuteOfDay(s.window.endMinute)}",
+                        locked = !premium && s.id != "sleep",
+                    ) { on ->
                         if (!premium && s.id != "sleep") paywall = UpsellReason.KIDS
                         else update { p -> p.copy(schedules = p.schedules.map { if (it.id == s.id) it.copy(enabled = on) else it }) }
                     }
                 }
                 if (policy.schedules.none { it.id == "study" }) {
-                    PrimaryButton("Добавить «Уроки»") {
+                    Spacer(Modifier.height(6.dp))
+                    PillButton(
+                        "Добавить «Уроки»", modifier = Modifier.fillMaxWidth(), icon = Icons.Rounded.Add,
+                        fill = SolidColor(MaterialTheme.colorScheme.primaryContainer), contentColor = Brand.GreenDark, elevated = false,
+                    ) {
                         gate(Feature.SCHEDULES, UpsellReason.KIDS) {
                             update { it.copy(schedules = it.schedules + ScheduleRule("study", "Уроки", TimeWindow(TimeWindow.hm(8, 30), TimeWindow.hm(14), ru.ubt.familyshield.shared.model.WEEKDAYS), ScheduleMode.BLOCK_CATEGORIES, setOf(AppCategory.GAMES, AppCategory.SOCIAL))) }
                         }
@@ -90,42 +121,66 @@ fun ChildControls(graph: AppGraph, member: MemberEntity, onBack: () -> Unit) {
                 }
             }
 
-            SectionCard(title = "Интернет и приложения") {
-                ToggleRow("Безопасный интернет", "Блокировать сайты 18+, мошенничество и вредоносные страницы", checked = policy.webFilter.enabled, locked = !graph.entitlements.has(Feature.WEB_FILTER)) { on ->
+            GroupCard(title = "Интернет и приложения") {
+                IconToggleRow(
+                    "Безопасный интернет", FeatureIcons.Web.icon, FeatureIcons.Web.gradient, checked = policy.webFilter.enabled,
+                    subtitle = "Блокировать сайты 18+, мошенничество и вредоносные страницы", locked = !graph.entitlements.has(Feature.WEB_FILTER),
+                ) { on ->
                     gate(Feature.WEB_FILTER, UpsellReason.KIDS) { update { it.copy(webFilter = it.webFilter.copy(enabled = on)) } }
                 }
                 if (policy.webFilter.enabled) {
-                    ToggleRow("Безопасный поиск", "Яндекс, Google, YouTube в детском режиме", checked = policy.webFilter.safeSearch) { on -> update { it.copy(webFilter = it.webFilter.copy(safeSearch = on)) } }
-                    ToggleRow("Блокировать соцсети и знакомства", checked = WebCategory.SOCIAL in policy.webFilter.categories) { on ->
+                    IconToggleRow(
+                        "Безопасный поиск", Icons.Rounded.TravelExplore, Gradients.Ocean, checked = policy.webFilter.safeSearch,
+                        subtitle = "Яндекс, Google, YouTube в детском режиме",
+                    ) { on -> update { it.copy(webFilter = it.webFilter.copy(safeSearch = on)) } }
+                    IconToggleRow("Блокировать соцсети и знакомства", Icons.Rounded.Groups, Gradients.Coral, checked = WebCategory.SOCIAL in policy.webFilter.categories) { on ->
                         update { p -> p.copy(webFilter = p.webFilter.copy(categories = if (on) p.webFilter.categories + WebCategory.SOCIAL + WebCategory.DATING else p.webFilter.categories - WebCategory.SOCIAL - WebCategory.DATING)) }
                     }
                 }
-                ToggleRow("Одобрять новые приложения", "Спрашивать разрешение перед запуском новых игр и приложений", checked = policy.requireApprovalForNewApps, locked = !graph.entitlements.has(Feature.APP_APPROVAL)) { on ->
+                IconToggleRow(
+                    "Одобрять новые приложения", Icons.Rounded.InstallMobile, Gradients.Violet, checked = policy.requireApprovalForNewApps,
+                    subtitle = "Спрашивать разрешение перед запуском новых игр и приложений", locked = !graph.entitlements.has(Feature.APP_APPROVAL),
+                ) { on ->
                     gate(Feature.APP_APPROVAL, UpsellReason.KIDS) { update { it.copy(requireApprovalForNewApps = on) } }
                 }
             }
 
-            SectionCard(title = "Безопасность") {
-                ToggleRow("Оповещать об опасных переписках", "Травля, вербовка, незнакомые взрослые, угрозы", checked = policy.messageMonitoring.enabled, locked = !graph.entitlements.has(Feature.RISK_ALERTS)) { on ->
+            GroupCard(title = "Безопасность") {
+                IconToggleRow(
+                    "Оповещать об опасных переписках", Icons.Rounded.MarkChatUnread, Gradients.Danger, checked = policy.messageMonitoring.enabled,
+                    subtitle = "Травля, вербовка, незнакомые взрослые, угрозы", locked = !graph.entitlements.has(Feature.RISK_ALERTS),
+                ) { on ->
                     gate(Feature.RISK_ALERTS, UpsellReason.KIDS) { update { it.copy(messageMonitoring = it.messageMonitoring.copy(enabled = on)) } }
                 }
                 if (policy.messageMonitoring.enabled && policy.ageBand.isTeen) {
-                    ToggleRow("Щадящий режим для подростка", "Сообщать только о самом опасном (угроза жизни, вербовка)", checked = policy.messageMonitoring.criticalOnly) { on ->
+                    IconToggleRow(
+                        "Щадящий режим для подростка", Icons.Rounded.VisibilityOff, Gradients.Slate, checked = policy.messageMonitoring.criticalOnly,
+                        subtitle = "Сообщать только о самом опасном (угроза жизни, вербовка)",
+                    ) { on ->
                         update { it.copy(messageMonitoring = it.messageMonitoring.copy(criticalOnly = on)) }
                     }
                 }
-                ToggleRow("Защита от удаления", "Нельзя удалить приложение и отключить защиту без вас", checked = policy.uninstallProtection, locked = !graph.entitlements.has(Feature.UNINSTALL_PROTECTION)) { on ->
+                IconToggleRow(
+                    "Защита от удаления", Icons.Rounded.PhonelinkLock, Gradients.Emerald, checked = policy.uninstallProtection,
+                    subtitle = "Нельзя удалить приложение и отключить защиту без вас", locked = !graph.entitlements.has(Feature.UNINSTALL_PROTECTION),
+                ) { on ->
                     gate(Feature.UNINSTALL_PROTECTION, UpsellReason.KIDS) { update { it.copy(uninstallProtection = on) } }
                 }
             }
 
-            Gap(24.dp)
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
 
 private fun scheduleLabel(s: ScheduleRule) = when (s.id) {
-    "sleep" -> "🌙 Сон"
-    "study", "school" -> "📚 Уроки"
+    "sleep" -> "Сон"
+    "study", "school" -> "Уроки"
     else -> s.name
+}
+
+private fun scheduleVisual(s: ScheduleRule): Visual = when (s.id) {
+    "sleep" -> FeatureIcons.Sleep
+    "study", "school" -> FeatureIcons.Study
+    else -> Visual(Icons.Rounded.Schedule, Gradients.Slate)
 }

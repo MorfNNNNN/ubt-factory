@@ -1,118 +1,193 @@
 package ru.ubt.familyshield.ui.guardian
 
-import ru.ubt.familyshield.ui.components.visual
-
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.HelpOutline
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.GppMaybe
+import androidx.compose.material.icons.rounded.InstallMobile
+import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.MoreTime
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import ru.ubt.familyshield.AppGraph
+import ru.ubt.familyshield.R
 import ru.ubt.familyshield.core.db.AlertEntity
+import ru.ubt.familyshield.core.db.MemberEntity
 import ru.ubt.familyshield.core.db.RequestEntity
+import ru.ubt.familyshield.shared.ShieldJson
 import ru.ubt.familyshield.shared.model.AlertSeverity
+import ru.ubt.familyshield.shared.model.AlertType
+import ru.ubt.familyshield.shared.model.MemberRequest
+import ru.ubt.familyshield.shared.model.MemberRole
+import ru.ubt.familyshield.shared.model.RequestKind
 import ru.ubt.familyshield.ui.FamilyUiState
 import ru.ubt.familyshield.ui.ShieldViewModel
-import ru.ubt.familyshield.ui.components.Avatar
-import ru.ubt.familyshield.ui.components.EmptyState
-import ru.ubt.familyshield.ui.components.Pill
-import ru.ubt.familyshield.ui.components.PrimaryButton
-import ru.ubt.familyshield.ui.components.ScreenScaffold
-import ru.ubt.familyshield.ui.components.SecondaryButton
-import ru.ubt.familyshield.ui.components.SectionCard
+import ru.ubt.familyshield.ui.components.AvatarImage
+import ru.ubt.familyshield.ui.components.FeatureIcons
+import ru.ubt.familyshield.ui.components.IconTile
+import ru.ubt.familyshield.ui.components.LottieView
+import ru.ubt.familyshield.ui.components.SectionHeader
+import ru.ubt.familyshield.ui.components.SoftCard
+import ru.ubt.familyshield.ui.components.Visual
 import ru.ubt.familyshield.ui.components.relativeTime
 import ru.ubt.familyshield.ui.components.severityColor
-import ru.ubt.familyshield.ui.components.severityLabel
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
+import ru.ubt.familyshield.ui.components.visual
+import ru.ubt.familyshield.ui.theme.Brand
+import ru.ubt.familyshield.ui.theme.Gradients
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun AlertsScreen(graph: AppGraph, vm: ShieldViewModel, state: FamilyUiState, onOpenMember: (String) -> Unit) {
     LaunchedEffect(Unit) { vm.markAlertsRead() }
-    val scope = rememberCoroutineScope()
-    fun name(deviceId: String) = state.members.firstOrNull { it.deviceId == deviceId }?.displayName ?: "Близкий"
+    fun member(deviceId: String) = state.members.firstOrNull { it.deviceId == deviceId }
+    fun name(deviceId: String) = member(deviceId)?.displayName ?: "Близкий"
 
-    ScreenScaffold(title = "События") { padding ->
-        if (state.alerts.isEmpty() && state.pendingRequests.isEmpty()) {
-            EmptyState("🕊️", "Пока спокойно", "Здесь появятся предупреждения о мошенничестве, угрозах детям, геозонах и запросы от близких.")
-            return@ScreenScaffold
+    val requests = state.pendingRequests.size
+    val subtitle = if (requests > 0) "$requests ${plural(requests, "запрос ждёт", "запроса ждут", "запросов ждут")} ответа" else null
+
+    if (state.alerts.isEmpty() && state.pendingRequests.isEmpty()) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            PageHeader("События")
+            ArtEmptyState(
+                "Пока спокойно",
+                "Здесь появятся предупреждения о мошенничестве, угрозах детям, геозонах и запросы от близких.",
+                modifier = Modifier.padding(top = 36.dp),
+            ) { LottieView(R.raw.lottie_shield_active, size = 180.dp) }
         }
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (state.pendingRequests.isNotEmpty()) {
-                item { Text("Запросы", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
-                items(state.pendingRequests, key = { it.id }) { req ->
-                    RequestCard(graph, req, name(req.deviceId))
-                }
+        return
+    }
+
+    val days = remember(state.alerts) { state.alerts.groupBy { dayOf(it.createdAt) } }
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item(key = "header") { PageHeader("События", subtitle = subtitle) }
+        if (state.pendingRequests.isNotEmpty()) {
+            item(key = "requests") { SectionHeader("Запросы") }
+            items(state.pendingRequests, key = { it.id }) { req ->
+                RequestCard(graph, req, member(req.deviceId), name(req.deviceId))
             }
-            item { Text("Лента", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp)) }
-            items(state.alerts, key = { it.id }) { alert ->
-                AlertCard(alert, name(alert.deviceId)) { onOpenMember(alert.deviceId) }
+        }
+        days.forEach { (day, alerts) ->
+            item(key = "day-$day") { SectionHeader(dayLabel(day)) }
+            items(alerts, key = { it.id }) { alert ->
+                AlertCard(alert, member(alert.deviceId), name(alert.deviceId)) { onOpenMember(alert.deviceId) }
             }
         }
     }
 }
 
 @Composable
-private fun AlertCard(alert: AlertEntity, memberName: String, onClick: () -> Unit) {
+private fun AlertCard(alert: AlertEntity, member: MemberEntity?, memberName: String, onClick: () -> Unit) {
     val severity = runCatching { AlertSeverity.valueOf(alert.severity) }.getOrDefault(AlertSeverity.INFO)
-    SectionCard(onClick = onClick) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            (runCatching { ru.ubt.familyshield.shared.model.AlertType.valueOf(alert.type).visual() }.getOrNull() ?: ru.ubt.familyshield.ui.components.FeatureIcons.Protection)
-                .let { ru.ubt.familyshield.ui.components.IconTile(it.icon, it.gradient, size = 40.dp) }
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(alert.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                    if (severity >= AlertSeverity.WARNING) Pill(severityLabel(severity), severityColor(severity))
+    val visual = runCatching { AlertType.valueOf(alert.type).visual() }.getOrNull() ?: FeatureIcons.Protection
+    SoftCard(onClick = onClick, padding = 16.dp) {
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            IconTile(visual.icon, visual.gradient, size = 46.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(alert.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    if (severity >= AlertSeverity.WARNING) SeverityChip(severity)
                 }
                 Text(alert.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                alert.excerpt?.takeIf { it.isNotBlank() }?.let {
-                    Text("«${it.take(140)}»", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Text("$memberName · ${relativeTime(alert.createdAt)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+        alert.excerpt?.takeIf { it.isNotBlank() }?.let {
+            QuoteBlock("«${it.take(140)}»", accent = severityColor(severity))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AvatarImage(member?.avatar, member?.role, 24.dp)
+            Text(
+                listOfNotNull(memberName, relativeTime(alert.createdAt), alert.sourceAppLabel?.takeIf { it.isNotBlank() }).joinToString(" · "),
+                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
 
 @Composable
-private fun RequestCard(graph: AppGraph, req: RequestEntity, memberName: String) {
+private fun RequestCard(graph: AppGraph, req: RequestEntity, member: MemberEntity?, memberName: String) {
     val scope = rememberCoroutineScope()
-    SectionCard(container = MaterialTheme.colorScheme.secondaryContainer) {
-        Text("$memberName ${requestSummary(req)}", style = MaterialTheme.typography.titleSmall)
+    val request = remember(req.json) { runCatching { ShieldJson.decodeFromString(MemberRequest.serializer(), req.json) }.getOrNull() }
+    val kind = requestVisual(request?.kind)
+    SoftCard(padding = 16.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box {
+                AvatarImage(member?.avatar, member?.role ?: MemberRole.CHILD.name, 50.dp)
+                Box(Modifier.align(Alignment.BottomEnd).offset(x = 5.dp, y = 5.dp)) { IconTile(kind.icon, kind.gradient, size = 24.dp) }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(fontWeight = FontWeight.ExtraBold)) { append(memberName) }
+                        append(" ")
+                        append(requestSummary(req))
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(relativeTime(req.createdAt), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        request?.reason?.takeIf { it.isNotBlank() }?.let { QuoteBlock("«$it»", accent = Brand.Blue) }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PrimaryButton("Разрешить", modifier = Modifier.weight(1f)) { scope.launch { graph.guardian.decide(req, approved = true) } }
-            SecondaryButton("Отклонить", modifier = Modifier.weight(1f)) { scope.launch { graph.guardian.decide(req, approved = false) } }
+            PillButton("Разрешить", modifier = Modifier.weight(1f), icon = Icons.Rounded.Check) {
+                scope.launch { graph.guardian.decide(req, approved = true) }
+            }
+            PillButton(
+                "Отклонить", modifier = Modifier.weight(1f), icon = Icons.Rounded.Close,
+                fill = tintedFill(), contentColor = MaterialTheme.colorScheme.onSurface, elevated = false,
+            ) {
+                scope.launch { graph.guardian.decide(req, approved = false) }
+            }
         }
     }
 }
 
-fun alertEmoji(type: String): String = when (type) {
-    "SOS" -> "🆘"
-    "FALL_DETECTED" -> "🧓"
-    "BANK_APP_DURING_CALL", "OTP_DURING_CALL", "REMOTE_ACCESS_APP" -> "🚨"
-    "SCAM_CALL_BLOCKED", "SUSPICIOUS_CALL", "LONG_CALL_UNKNOWN" -> "📞"
-    "SCAM_MESSAGE", "PHISHING_LINK" -> "✉️"
-    "CHILD_RISK_MESSAGE" -> "🛑"
-    "RISKY_APP_INSTALLED", "NEW_APP_INSTALLED" -> "📦"
-    "BLOCKED_SITE", "FILTER_BYPASS" -> "🌐"
-    "LIMIT_REACHED" -> "⏳"
-    "GEOFENCE_ENTER", "GEOFENCE_EXIT" -> "📍"
-    "LOW_BATTERY" -> "🔋"
-    "CHECK_IN_OK" -> "👍"
-    "CHECK_IN_MISSED", "INACTIVITY" -> "⏰"
-    "MEDICATION_MISSED", "MEDICATION_TAKEN" -> "💊"
-    "TAMPER", "UNINSTALL_ATTEMPT", "PERMISSION_REVOKED" -> "🔧"
-    else -> "🔔"
+private fun requestVisual(kind: RequestKind?): Visual = when (kind) {
+    RequestKind.MORE_TIME -> Visual(Icons.Rounded.MoreTime, Gradients.Sky)
+    RequestKind.APP_APPROVAL -> Visual(Icons.Rounded.InstallMobile, Gradients.Violet)
+    RequestKind.SITE_UNBLOCK -> Visual(Icons.Rounded.Language, Gradients.Violet)
+    RequestKind.PROTECTION_CHANGE -> Visual(Icons.Rounded.GppMaybe, Gradients.Danger)
+    null -> Visual(Icons.AutoMirrored.Rounded.HelpOutline, Gradients.Slate)
+}
+
+private fun dayOf(ts: Long): LocalDate = Instant.ofEpochMilli(ts).atZone(ZoneId.systemDefault()).toLocalDate()
+
+private fun dayLabel(day: LocalDate, today: LocalDate = LocalDate.now()): String = when (day) {
+    today -> "Сегодня"
+    today.minusDays(1) -> "Вчера"
+    else -> day.format(DateTimeFormatter.ofPattern(if (day.year == today.year) "d MMMM" else "d MMMM yyyy", Locale("ru")))
 }

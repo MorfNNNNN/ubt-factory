@@ -1,0 +1,8 @@
+3D object icons (res/drawable-nodpi/ic3d_*.webp)
+
+Source: 3dicons — https://3dicons.co — by Vijay Verma (realvjy)
+License: Creative Commons Zero v1.0 Universal (CC0 1.0)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+The icons are free for personal and commercial use; attribution is not required.
+They were trimmed and resized for the app.
