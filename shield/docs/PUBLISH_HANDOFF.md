@@ -40,7 +40,7 @@ Claude Code. Из сетей Google и Amazon SSH проходит: 29.10.2026 �
 VMmanager у клиентов больше нет: после взлома 17.10.2026 FirstVDS закрыл к нему доступ.
 
 Проще всего ставить из блокнота Google Colab, он работает на серверах Google:
-https://colab.research.google.com/github/MorfNNNNN/ubt-factory/blob/2a8f99db3259279379e341c31fb94caa5b188305/shield/deploy/install_from_colab.ipynb
+https://colab.research.google.com/github/MorfNNNNN/ubt-factory/blob/7de0646f47d26b8e6a5de6a51b77a4a2c21820c1/shield/deploy/install_from_colab.ipynb
 Меню «Среда выполнения» → «Выполнить все», на предупреждение «Этот блокнот создан не Google» — «Всё
 равно запустить». Пароль в поле «Пароль root» вводит владелец. Блокнот сам загрузит установщик,
 покажет ход установки, проверит сайт и предложит сменить пароль root. Закрытая вкладка установку не

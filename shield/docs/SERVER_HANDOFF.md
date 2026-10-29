@@ -27,7 +27,7 @@
 
    Если SSH из вашей сети не проходит, ставьте из Google Colab: сеть Google SSH
    пропускает. Блокнот `shield/deploy/install_from_colab.ipynb`:
-   https://colab.research.google.com/github/MorfNNNNN/ubt-factory/blob/2a8f99db3259279379e341c31fb94caa5b188305/shield/deploy/install_from_colab.ipynb
+   https://colab.research.google.com/github/MorfNNNNN/ubt-factory/blob/7de0646f47d26b8e6a5de6a51b77a4a2c21820c1/shield/deploy/install_from_colab.ipynb
    — «Среда выполнения» → «Выполнить все», затем пароль root.
 
    Установщик: ставит Docker (зеркало `mirror.gcr.io` для Docker Hub), при
