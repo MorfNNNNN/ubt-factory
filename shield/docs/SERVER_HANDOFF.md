@@ -25,6 +25,11 @@
    Короткая ссылка на тот же файл: `curl -fsSL https://clck.ru/3WcBfb | bash -s familyapp1.ru`.
    Под `admin` — с `sudo bash`.
 
+   Если SSH из вашей сети не проходит, ставьте из Google Colab: сеть Google SSH
+   пропускает. Блокнот `shield/deploy/install_from_colab.ipynb`:
+   https://colab.research.google.com/github/MorfNNNNN/ubt-factory/blob/2a8f99db3259279379e341c31fb94caa5b188305/shield/deploy/install_from_colab.ipynb
+   — «Среда выполнения» → «Выполнить все», затем пароль root.
+
    Установщик: ставит Docker (зеркало `mirror.gcr.io` для Docker Hub), при
    нехватке памяти включает swap 2 ГБ, открывает 80/443 в ufw/firewalld,
    клонирует репозиторий в `/opt/family-shield`, скачивает готовый jar сервера
@@ -67,6 +72,8 @@ curl -sI https://familyapp1.ru/privacy             # 200
   открывается, но SSH-приветствие доходит только по части маршрутов. 28.10.2026
   проходил из Timeweb, Yandex Cloud, Hetzner, SERV.HOST, Datacheap; не проходил
   из МТС, Билайна, Selectel, Cloud.ru, GitHub Actions и облака Claude Code.
+  29.10.2026 проходил из всех 18 проверенных точек Google Cloud и Amazon AWS
+  (США, Европа, Азия).
   FirstVDS с июня 2026 пишет о фильтрации SSH и HTTPS на стороне операторов и
   советует сменить сеть, например на мобильный интернет.
 - После взлома VMmanager 17.10.2026 FirstVDS закрыл клиентам доступ к VMmanager,
