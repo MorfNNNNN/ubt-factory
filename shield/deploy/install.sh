@@ -14,6 +14,8 @@ REPO="${SHIELD_REPO:-https://github.com/MorfNNNNN/ubt-factory.git}"
 BRANCH="${SHIELD_BRANCH:-claude/cool-gates-wyu9vs}"
 JAR_URL="${SHIELD_JAR_URL:-https://github.com/MorfNNNNN/ubt-factory/releases/download/server-latest/family-shield-server.jar}"
 DIR="${SHIELD_DIR:-/opt/family-shield}"
+# Set by install-local.sh: the unpacked archive to install from instead of cloning GitHub.
+LOCAL_SRC="${SHIELD_LOCAL_SRC:-}"
 
 say() { printf '\n\033[1;32m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m!! %s\033[0m\n' "$*" >&2; }
@@ -86,18 +88,26 @@ main() {
     firewall-cmd -q --permanent --add-service=http --add-service=https && firewall-cmd -q --reload
   fi
 
-  say "Код ($BRANCH)"
-  if [ -d "$DIR/.git" ]; then
+  if [ -n "$LOCAL_SRC" ]; then
+    # Offline install from the unpacked source archive, for servers that cannot reach GitHub.
+    say "Код из архива ($LOCAL_SRC)"
+    mkdir -p "$DIR"
+    [ "$(cd "$LOCAL_SRC" && pwd)" = "$(cd "$DIR" && pwd)" ] || cp -a "$LOCAL_SRC/." "$DIR/"
+  elif [ -d "$DIR/.git" ]; then
+    say "Код ($BRANCH)"
     git -C "$DIR" fetch -q --depth 1 origin "$BRANCH"
     git -C "$DIR" reset -q --hard FETCH_HEAD
   else
+    say "Код ($BRANCH)"
     git clone -q --depth 1 -b "$BRANCH" "$REPO" "$DIR"
   fi
   cd "$DIR/shield/deploy"
 
   say "Серверная программа"
   mkdir -p prebuilt
-  if curl -fsSL --retry 3 -o prebuilt/family-shield-server.jar.part "$JAR_URL"; then
+  if [ -n "$LOCAL_SRC" ] && [ -s prebuilt/family-shield-server.jar ]; then
+    dockerfile=server/Dockerfile.prebuilt
+  elif curl -fsSL --retry 3 --max-time 120 -o prebuilt/family-shield-server.jar.part "$JAR_URL"; then
     mv prebuilt/family-shield-server.jar.part prebuilt/family-shield-server.jar
     dockerfile=server/Dockerfile.prebuilt
   else
@@ -145,10 +155,14 @@ BRANCH='$BRANCH'
 DOMAIN='$DOMAIN'
 JAR_URL='$JAR_URL'
 EOF
-  install -m 755 "$DIR/shield/deploy/update.sh" /usr/local/sbin/family-shield-update
-  echo '*/10 * * * * root /usr/local/sbin/family-shield-update >>/var/log/family-shield-update.log 2>&1' \
-    >/etc/cron.d/family-shield-update
-  /usr/local/sbin/family-shield-update --record || warn "не удалось запомнить версию для автообновления"
+  if [ -n "$LOCAL_SRC" ]; then
+    rm -f /etc/cron.d/family-shield-update  # an archive install has no git remote to update from
+  else
+    install -m 755 "$DIR/shield/deploy/update.sh" /usr/local/sbin/family-shield-update
+    echo '*/10 * * * * root /usr/local/sbin/family-shield-update >>/var/log/family-shield-update.log 2>&1' \
+      >/etc/cron.d/family-shield-update
+    /usr/local/sbin/family-shield-update --record || warn "не удалось запомнить версию для автообновления"
+  fi
 
   server_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") print $(i + 1)}' || true)
   dns_ip=$(getent ahostsv4 "$DOMAIN" | awk 'NR == 1 {print $1}' || true)
